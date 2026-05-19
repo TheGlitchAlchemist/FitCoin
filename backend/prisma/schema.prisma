@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model actividadfisica {
+  id_actividad       Int                                @id @default(autoincrement())
+  id_usuario         Int?
+  id_tipo_actividad  Int?
+  valor_medido       Float?                             @db.Float
+  duracion_minutos   Int?
+  ritmo_promedio     Float?                             @db.Float
+  fitcoins_otorgados Int?                               @default(0)
+  fecha_inicio       DateTime?                          @db.DateTime(0)
+  fecha_finalizacion DateTime?                          @db.DateTime(0)
+  estado_validacion  actividadfisica_estado_validacion? @default(Pendiente)
+  usuario            usuario?                           @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict, onUpdate: Restrict, map: "actividadfisica_ibfk_1")
+  tipoactividad      tipoactividad?                     @relation(fields: [id_tipo_actividad], references: [id_tipo_actividad], onDelete: Restrict, onUpdate: Restrict, map: "actividadfisica_ibfk_2")
+  transaccion        transaccion[]
+
+  @@index([id_tipo_actividad], map: "id_tipo_actividad")
+  @@index([id_usuario], map: "id_usuario")
+}
+
+model alladocomercial {
+  id_aliado       Int              @id @default(autoincrement())
+  nombre          String           @db.VarChar(100)
+  id_categoria    Int?
+  comision_pct    Float?           @default(0) @db.Float
+  categoriaaliado categoriaaliado? @relation(fields: [id_categoria], references: [id_categoria], onDelete: Restrict, onUpdate: Restrict, map: "alladocomercial_ibfk_1")
+  recompensa      recompensa[]
+
+  @@index([id_categoria], map: "id_categoria")
+}
+
+model canje {
+  id_canje      Int           @id @default(autoincrement())
+  id_usuario    Int?
+  id_recompensa Int?
+  fecha_canje   DateTime?     @default(now()) @db.DateTime(0)
+  codigo_uso    String?       @unique(map: "codigo_uso") @db.VarChar(20)
+  estado        canje_estado? @default(Generado)
+  usuario       usuario?      @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict, onUpdate: Restrict, map: "canje_ibfk_1")
+  recompensa    recompensa?   @relation(fields: [id_recompensa], references: [id_recompensa], onDelete: Restrict, onUpdate: Restrict, map: "canje_ibfk_2")
+  transaccion   transaccion[]
+
+  @@index([id_recompensa], map: "id_recompensa")
+  @@index([id_usuario], map: "id_usuario")
+}
+
+model categoriaaliado {
+  id_categoria     Int               @id @default(autoincrement())
+  nombre_categoria String            @db.VarChar(50)
+  alladocomercial  alladocomercial[]
+}
+
+model participacionreto {
+  id_usuario      Int
+  id_reto         Int
+  progreso_actual Int?                      @default(0)
+  estado          participacionreto_estado? @default(Activo)
+  usuario         usuario                   @relation(fields: [id_usuario], references: [id_usuario], onUpdate: Restrict, map: "participacionreto_ibfk_1")
+  reto            reto                      @relation(fields: [id_reto], references: [id_reto], onUpdate: Restrict, map: "participacionreto_ibfk_2")
+
+  @@id([id_usuario, id_reto])
+  @@index([id_reto], map: "id_reto")
+}
+
+model recompensa {
+  id_recompensa     Int              @id @default(autoincrement())
+  id_aliado         Int?
+  nombre_recompensa String           @db.VarChar(100)
+  costo_fitcoins    Int
+  disponible        Boolean?         @default(true)
+  canje             canje[]
+  alladocomercial   alladocomercial? @relation(fields: [id_aliado], references: [id_aliado], onDelete: Restrict, onUpdate: Restrict, map: "recompensa_ibfk_1")
+
+  @@index([id_aliado], map: "id_aliado")
+}
+
+model reto {
+  id_reto            Int                 @id @default(autoincrement())
+  nombre_reto        String              @db.VarChar(100)
+  tipo_objetivo      String?             @db.VarChar(50)
+  valor_objetivo     Int?
+  recompensa_fitcoin Int?
+  fecha_inicio       DateTime?           @db.DateTime(0)
+  fecha_finalizacion DateTime?           @db.DateTime(0)
+  participacionreto  participacionreto[]
+}
+
+model suscripcion {
+  id_suscripcion   Int       @id @default(autoincrement())
+  tipo_suscripcion String    @db.VarChar(50)
+  usuario          usuario[]
+}
+
+model tipoactividad {
+  id_tipo_actividad Int               @id @default(autoincrement())
+  nombre_tipo       String            @db.VarChar(50)
+  actividadfisica   actividadfisica[]
+}
+
+model transaccion {
+  id_transaccion    Int                          @id @default(autoincrement())
+  id_usuario        Int?
+  tipo_transaccion  transaccion_tipo_transaccion
+  cantidad_fitcoin  Int
+  fecha_transaccion DateTime?                    @default(now()) @db.DateTime(0)
+  id_canje          Int?
+  id_actividad      Int?
+  usuario           usuario?                     @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict, onUpdate: Restrict, map: "transaccion_ibfk_1")
+  canje             canje?                       @relation(fields: [id_canje], references: [id_canje], onDelete: Restrict, onUpdate: Restrict, map: "transaccion_ibfk_2")
+  actividadfisica   actividadfisica?             @relation(fields: [id_actividad], references: [id_actividad], onDelete: Restrict, onUpdate: Restrict, map: "transaccion_ibfk_3")
+
+  @@index([id_actividad], map: "id_actividad")
+  @@index([id_canje], map: "id_canje")
+  @@index([id_usuario], map: "id_usuario")
+}
+
+model usuario {
+  id_usuario        Int                 @id @default(autoincrement())
+  nombre            String              @db.VarChar(100)
+  email             String              @unique(map: "email") @db.VarChar(100)
+  password          String              @db.VarChar(255)
+  telefono          String?             @db.VarChar(20)
+  fecha_registro    DateTime?           @default(now()) @db.DateTime(0)
+  id_suscripcion    Int?
+  fitcoins_saldo    Int?                @default(0)
+  actividadfisica   actividadfisica[]
+  canje             canje[]
+  participacionreto participacionreto[]
+  transaccion       transaccion[]
+  suscripcion       suscripcion?        @relation(fields: [id_suscripcion], references: [id_suscripcion], onDelete: Restrict, onUpdate: Restrict, map: "usuario_ibfk_1")
+
+  @@index([id_suscripcion], map: "id_suscripcion")
+}
+
+enum transaccion_tipo_transaccion {
+  Ingreso
+  Egreso
+}
+
+enum participacionreto_estado {
+  Activo
+  Completado
+  Abandono
+}
+
+enum canje_estado {
+  Generado
+  Usado
+  Expirado
+}
+
+enum actividadfisica_estado_validacion {
+  Pendiente
+  Aprobado
+  Rechazado
+}

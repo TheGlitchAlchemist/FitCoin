@@ -1,6 +1,20 @@
-import React from 'react';
-import LoginScreen from './Screens/LoginScreen'; // Ajusta la ruta si creaste subcarpetas
+import React, { useState } from 'react';
+import LoginScreen from './Screens/Login/LoginScreen';
+import RegisterScreen from './Screens/Register/RegisterScreen';
 
 export default function App() {
-  return <LoginScreen />;
+  // 'login' o 'register'
+  const [currentScreen, setCurrentScreen] = useState('login'); 
+
+  if (currentScreen === 'login') {
+    return (
+      <LoginScreen onNavigateToRegister={() => setCurrentScreen('register')} />
+    );
+  }
+
+  if (currentScreen === 'register') {
+    return (
+      <RegisterScreen onNavigateToLogin={() => setCurrentScreen('login')} />
+    );
+  }
 }

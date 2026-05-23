@@ -43,4 +43,15 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+
+  // ... (lo que ya tenías se queda igual)
+  registerLink: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  registerLinkText: {
+    color: '#4CD964', // Verde FitCoin
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });

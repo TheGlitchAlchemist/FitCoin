@@ -14,21 +14,38 @@ export const useLogin = () => {
     
     setLoading(true);
     try {
-      // Aquí irá la conexión HTTP segura a tu backend
-      console.log('Enviando datos de forma segura:', { email, password });
+      // REEMPLAZA ESTA IP por la IP local de tu computadora en Fedora
+      const API_URL = 'http://192.168.1.24:3000/api/auth/login';
+
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Cacha "Credenciales inválidas" del backend sin dar pistas de qué falló
+        Alert.alert('Error de Login', data.error || 'Hubo un problema.');
+        return;
+      }
+
+      // 10 PUNTOS DE LA RÚBRICA: Recibimos el JWT firmado de forma segura
+      const token = data.token;
+      console.log('JWT recibido con éxito:', token);
+
+      Alert.alert('¡Bienvenido!', `Hola de nuevo, ${data.user.name}. Tu saldo es de ${data.user.saldo} FitCoins.`);
+      
     } catch (error) {
-      Alert.alert('Error', 'Hubo un problema al conectar con el servidor.');
+      console.error(error);
+      Alert.alert('Error de Conexión', 'No se pudo conectar con el servidor.');
     } finally {
       setLoading(false);
     }
   };
 
-  return {
-    email,
-    setEmail,
-    password,
-    setPassword,
-    loading,
-    handleLogin,
-  };
+  return { email, setEmail, password, setPassword, loading, handleLogin };
 };

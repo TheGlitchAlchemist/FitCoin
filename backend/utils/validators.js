@@ -22,7 +22,7 @@ const isValidPassword = (password) => {
   return true;
 };
 
-// Validar formato de email básico (adición extra de seguridad)
+// Validar formato de email básico 
 const isValidEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);

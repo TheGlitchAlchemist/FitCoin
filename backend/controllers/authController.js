@@ -85,7 +85,6 @@ const login = async (req, res) => {
   }
 };
 
-// COMPROBADO: Exportación correcta para destructuración
 module.exports = {
   register,
   login

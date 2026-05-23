@@ -8,7 +8,6 @@ export const useRegister = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // REPLICAMOS LA VALIDACIÓN EXACTA DEL BACKEND POR UX
   const isValidPassword = (pass) => {
     if (pass.length < 10) return false;
     if (!/[A-Z]/.test(pass)) return false;
@@ -32,7 +31,7 @@ export const useRegister = () => {
       return;
     }
 
-    // 3. NUEVA: Validación de política de contraseña robusta
+
     if (!isValidPassword(password)) {
       Alert.alert(
         'Contraseña Débil',

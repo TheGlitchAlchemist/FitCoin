@@ -14,7 +14,7 @@ export const useLogin = () => {
     
     setLoading(true);
     try {
-      // REEMPLAZA ESTA IP por la IP local de tu computadora en Fedora
+      
       const API_URL = 'http://192.168.1.24:3000/api/auth/login';
 
       const response = await fetch(API_URL, {
@@ -33,7 +33,7 @@ export const useLogin = () => {
         return;
       }
 
-      // 10 PUNTOS DE LA RÚBRICA: Recibimos el JWT firmado de forma segura
+    
       const token = data.token;
       console.log('JWT recibido con éxito:', token);
 

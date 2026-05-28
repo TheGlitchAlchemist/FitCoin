@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # Servicio de la Base de Datos MySQL
+  db:
+    image: mysql:8.0
+    container_name: fitcoin_mysql_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: black6901
+      MYSQL_DATABASE: fitcoin
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - fitcoin_network
+
+  # Servicio de tu API Express
+  api:
+    build: .
+    container_name: fitcoin_express_api
+    restart: always
+    ports:
+      - "3000:3000"
+
+    environment:
+      - PORT=3000
+      - DATABASE_URL=mysql://root:black6901@db:3306/fitcoin
+      - JWT_SECRET="A+BPBV/wJrFjrD71z75N5848SQz0itfFfrC9ZjRsCB3tRmkCFBhc/ku9x0P99sbJ"
+    depends_on:
+      - db
+    networks:
+      - fitcoin_network
+
+volumes:
+  mysql_data:
+
+networks:
+  fitcoin_network:
+    driver: bridge

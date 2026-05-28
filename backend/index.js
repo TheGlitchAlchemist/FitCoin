@@ -1,9 +1,9 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const cors = require('cors');
-// 1. IMPORTA AQUÍ TUS RUTAS DE AUTENTICACIÓN
 const authRoutes = require('./routes/authRoutes'); 
 
+const helmet = require('helmet');
 const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3000;
@@ -11,6 +11,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+app.use(helmet());
 
 app.use('/api/auth', authRoutes); 
 

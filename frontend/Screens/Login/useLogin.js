@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Alert } from 'react-native';
+import { saveToken } from '../../utils/secureStorage'; 
 
 export const useLogin = () => {
   const [email, setEmail] = useState('');
@@ -14,7 +15,6 @@ export const useLogin = () => {
     
     setLoading(true);
     try {
-      
       const API_URL = 'http://192.168.1.24:3000/api/auth/login';
 
       const response = await fetch(API_URL, {
@@ -28,16 +28,21 @@ export const useLogin = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        // Cacha "Credenciales inválidas" del backend sin dar pistas de qué falló
+       
         Alert.alert('Error de Login', data.error || 'Hubo un problema.');
         return;
       }
 
-    
       const token = data.token;
       console.log('JWT recibido con éxito:', token);
+      // Delegamos el token al KeyStore (Android) 
+      await saveToken(token);
+      console.log('JWT almacenado con cifrado simétrico nativo en el dispositivo.');
 
-      Alert.alert('¡Bienvenido!', `Hola de nuevo, ${data.user.name}. Tu saldo es de ${data.user.saldo} FitCoins.`);
+      Alert.alert(
+        '¡Bienvenido!', 
+        `Hola de nuevo, ${data.user.name}. Tu saldo es de ${data.user.saldo} FitCoins.`
+      );
       
     } catch (error) {
       console.error(error);

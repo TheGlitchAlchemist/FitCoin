@@ -9,8 +9,14 @@ const verificarToken = (req, res, next) => {
   }
 
   try {
+    
+    const secret = process.env.JWT_SECRET;
+    
+    if (!secret) {
+      console.error('Falta la variable de entorno JWT_SECRET en el servidor.');
+      return res.status(500).json({ error: 'Error interno de configuración del servidor.' });
+    }
 
-    const secret = process.env.JWT_SECRET || 'tu_llave_secreta_temporal';
     const verificado = jwt.verify(token, secret);
     
     req.user = verificado;

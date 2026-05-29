@@ -3,7 +3,8 @@ import { Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'reac
 import { useLogin } from './useLogin';
 import { styles } from './LoginStyles';
 
-export default function LoginScreen({ onNavigateToRegister }) {
+export default function LoginScreen({ onNavigateToRegister, onLoginSuccess }) {
+  
   const { 
     email, 
     setEmail, 
@@ -11,7 +12,7 @@ export default function LoginScreen({ onNavigateToRegister }) {
     setPassword, 
     loading, 
     handleLogin 
-  } = useLogin();
+  } = useLogin(onLoginSuccess);
 
   return (
     <View style={styles.container}>
@@ -48,7 +49,6 @@ export default function LoginScreen({ onNavigateToRegister }) {
         )}
       </TouchableOpacity>
 
-      {/* Nuevo botón para redireccionar */}
       <TouchableOpacity style={styles.registerLink} onPress={onNavigateToRegister}>
         <Text style={styles.registerLinkText}>¿No tienes cuenta? Regístrate aquí</Text>
       </TouchableOpacity>

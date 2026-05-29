@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Alert } from 'react-native';
 import { saveToken } from '../../utils/secureStorage'; 
 
-export const useLogin = () => {
+// Recibimos onLoginSuccess como parámetro en el hook
+export const useLogin = (onLoginSuccess) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,21 +29,23 @@ export const useLogin = () => {
       const data = await response.json();
 
       if (!response.ok) {
-       
         Alert.alert('Error de Login', data.error || 'Hubo un problema.');
         return;
       }
 
       const token = data.token;
       console.log('JWT recibido con éxito:', token);
+      
       // Delegamos el token al KeyStore (Android) 
       await saveToken(token);
       console.log('JWT almacenado con cifrado simétrico nativo en el dispositivo.');
 
-      Alert.alert(
-        '¡Bienvenido!', 
-        `Hola de nuevo, ${data.user.name}. Tu saldo es de ${data.user.saldo} FitCoins.`
-      );
+      if (onLoginSuccess) {
+        onLoginSuccess({
+          name: data.user.name,   
+          saldo: data.user.saldo  
+        });
+      }
       
     } catch (error) {
       console.error(error);

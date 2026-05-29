@@ -14,7 +14,9 @@ app.use(express.json());
 app.use(helmet());
 
 app.use('/api/auth', authRoutes); 
-
+app.get('/api/auth/test-directo', (req, res) => {
+    res.json({ mensaje: "¡Express sí lee este index.js real!" });
+});
 // Ruta de prueba de respuesta
 app.get('/', (req, res) => {
     res.send('Servidor conectado');

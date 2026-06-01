@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto'); 
 const { isValidPassword, isValidEmail } = require('../utils/validators');
 
 const prisma = new PrismaClient();
@@ -29,8 +30,18 @@ const register = async (req, res) => {
       return res.status(400).json({ error: 'El correo electrónico ya está registrado.' });
     }
 
+   
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+  
+    const datosCadena = `${name.trim()}-${email.trim().toLowerCase()}`;
+    const hashIntegridad = crypto
+      .createHash('sha256')
+      .update(datosCadena)
+      .digest('hex');
+
+    console.log(`[INTEGRIDAD] Hash SHA-256 generado para el registro: ${hashIntegridad}`);
 
     const newUser = await prisma.usuario.create({
       data: {
@@ -41,7 +52,12 @@ const register = async (req, res) => {
       },
     });
 
-    res.status(201).json({ message: 'Usuario registrado con éxito.', userId: newUser.id });
+
+    res.status(201).json({ 
+      message: 'Usuario registrado con éxito.', 
+      userId: newUser.id,
+      checksum: hashIntegridad 
+    });
 
   } catch (error) {
     console.error(error);
@@ -72,6 +88,13 @@ const login = async (req, res) => {
       JWT_SECRET,
       { expiresIn: '24h' }
     );
+
+    res.cookie('fitcoin_session', token, {
+      httpOnly: true,    
+      secure: true,       
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 
+    });
 
     res.status(200).json({
       message: 'Login exitoso.',

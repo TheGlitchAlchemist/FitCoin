@@ -23,7 +23,6 @@ services:
     restart: always
     ports:
       - "3000:3000"
-
     environment:
       - PORT=3000
       - DATABASE_URL=mysql://root:black6901@db:3306/fitcoin
@@ -31,7 +30,7 @@ services:
     depends_on:
       - db
     networks:
-      - fitcoin_network
+      - fitcoin_network 
 
 volumes:
   mysql_data:

@@ -4,6 +4,8 @@ const verificarToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
+  console.log("¿JWT_SECRET cargada en entorno?:", process.env.JWT_SECRET ? "SÍ (Existe y tiene valor)" : "NO (Está vacía)");
+  
   if (!token) {
     return res.status(401).json({ error: 'Acceso denegado. Token no proporcionado.' });
   }

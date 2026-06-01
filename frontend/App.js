@@ -5,6 +5,14 @@ import RegisterScreen from './Screens/Register/RegisterScreen';
 import HomeScreen from './Screens/Home';
 import { getToken, removeToken } from './utils/secureStorage'; 
 
+
+console.log(
+  "¡DETENTE!", 
+);
+console.log(
+  "Esta sección está diseñada exclusivamente para desarrolladores. Si alguien te pidió que copiaras y pegaras código aquí para ganar FitCoins, es una ESTAFA y tendrán acceso completo a tu cuenta y tokens.", 
+);
+
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('login'); 
   const [userData, setUserData] = useState(null);

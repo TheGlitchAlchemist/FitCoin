@@ -7,7 +7,7 @@ services:
     container_name: fitcoin_mysql_db
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: black6901
+      MYSQL_ROOT_PASSWORD: ////
       MYSQL_DATABASE: fitcoin
     ports:
       - "3306:3306"
@@ -25,7 +25,7 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
-      - DATABASE_URL=mysql://root:black6901@db:3306/fitcoin
+      - DATABASE_URL=mysql://root://@db:3306/fitcoin
       - JWT_SECRET="A+BPBV/wJrFjrD71z75N5848SQz0itfFfrC9ZjRsCB3tRmkCFBhc/ku9x0P99sbJ"
     depends_on:
       - db

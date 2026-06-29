@@ -1,55 +1,94 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ARCHIVO: Screens/Login/useLogin.ts
+//
+// FLUJO:
+//   1. signInWithPassword → autentica al usuario.
+//   2. Consulta profiles → obtiene nombre y datos del perfil.
+//   3. Consulta coin_transactions → obtiene saldo real (balance_after del último tx).
+//   4. Arma userData y lo manda a App.tsx → navega al Dashboard.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { useState } from 'react';
 import { Alert } from 'react-native';
-import { saveToken } from '../../utils/secureStorage'; 
+import { supabase } from '../../lib/supabase';
 
-// Recibimos onLoginSuccess como parámetro en el hook
-export const useLogin = (onLoginSuccess) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+type LoginSuccessData = {
+  nombre?: string;
+  name?: string;
+  email?: string;
+  saldo?: number;
+  [key: string]: unknown;
+};
+
+type UseLoginProps = (userData: LoginSuccessData) => void;
+
+export const useLogin = (onLoginSuccess?: UseLoginProps) => {
+  const [email, setEmail]       = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [loading, setLoading]   = useState<boolean>(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Error', 'Por favor, llena todos los campos.');
       return;
     }
-    
-    setLoading(true);
-    try {
-      const API_URL = 'http://192.168.1.24:3000/api/auth/login';
 
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+    setLoading(true);
+
+    try {
+      // AQUÍ SE AUTENTICA EL USUARIO CON SUPABASE
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        Alert.alert('Error de Login', data.error || 'Hubo un problema.');
+      if (authError) {
+        Alert.alert('Error de inicio de sesión', authError.message);
         return;
       }
 
-      const token = data.token;
-      console.log('JWT recibido con éxito:', token);
-      
-      // Delegamos el token al KeyStore (Android) 
-      await saveToken(token);
-      console.log('JWT almacenado con cifrado simétrico nativo en el dispositivo.');
+      const user = authData.user;
+      if (!user) {
+        Alert.alert('Error', 'No se pudo obtener la información del usuario.');
+        return;
+      }
 
+      // AQUÍ SE CONSULTA EL PERFIL DEL USUARIO EN public.profiles
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, avatar_url, role, status')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) {
+        console.warn('[useLogin] Perfil no encontrado:', profileError.message);
+      }
+
+      // AQUÍ SE OBTIENE EL SALDO REAL DEL USUARIO DESDE coin_transactions
+      // El saldo es el balance_after de la transacción más reciente.
+      // Si no hay transacciones aún, el saldo es 0.
+      const { data: lastTx } = await supabase
+        .from('coin_transactions')
+        .select('balance_after')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const saldo = lastTx?.balance_after ?? 0;
+
+      // AQUÍ SE MANDA AL DASHBOARD DESPUÉS DEL LOGIN
       if (onLoginSuccess) {
         onLoginSuccess({
-          name: data.user.name,   
-          saldo: data.user.saldo  
+          name:   profile?.full_name ?? user.email ?? 'Usuario',
+          nombre: profile?.full_name ?? user.email ?? 'Usuario',
+          email:  profile?.email     ?? user.email,
+          saldo,
         });
       }
-      
     } catch (error) {
-      console.error(error);
-      Alert.alert('Error de Conexión', 'No se pudo conectar con el servidor.');
+      console.error('[useLogin] Error inesperado:', error);
+      Alert.alert('Error', 'Ocurrió un problema inesperado. Inténtalo de nuevo.');
     } finally {
       setLoading(false);
     }

@@ -6,8 +6,30 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMotionUsageDescription": "FitCoin usa el sensor de movimiento para contar tus pasos y calcular tus FitCoins ganados."
+      }
     },
-    "android": {}
+    "android": {
+      "package": "com.fitcoin.app",
+      "softwareKeyboardLayoutMode": "pan",
+      "permissions": [
+        "android.permission.ACTIVITY_RECOGNITION"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "FitCoin necesita acceso al sensor de movimiento para contar tus pasos y calcular los FitCoins que ganas."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "17eaefb5-a98d-4ca9-9740-d7b05a73a60a"
+      }
+    }
   }
 }

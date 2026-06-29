@@ -1,417 +1,466 @@
-import { StyleSheet } from "react-native";
+import { StyleSheet } from 'react-native';
+import { ThemeColors } from '../../lib/theme';
 
+export function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: c.navy,
+    },
 
-const COLORS = {
-  navy: "#0B1324",
-  green: "#22C55E",
-  greenDark: "#16A34A",
-  gold: "#D4AF37",
-  background: "#F7F8FA",
-  white: "#FFFFFF",
-  gray: "#6B7280",
-  grayLight: "#E5E7EB",
-  mint: "#E8F9F1",
-};
+    scroll: {
+      flex: 1,
+    },
 
-const CARD_SHADOW = {
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 8 },
-  shadowOpacity: 0.1,
-  shadowRadius: 14,
-  elevation: 5,
-};
+    // ─── Hero (fondo oscuro) ──────────────────────────────────────────────────
+    hero: {
+      backgroundColor: c.navy,
+      paddingTop: 52,
+      paddingHorizontal: 22,
+      paddingBottom: 44,
+    },
 
-export const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 38,
+    },
 
-  scroll: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+    logoGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
 
-  hero: {
-    backgroundColor: COLORS.navy,
-    paddingTop: 48,
-    paddingHorizontal: 20,
-    paddingBottom: 36,
-    borderBottomLeftRadius: 34,
-    borderBottomRightRadius: 34,
-  },
+    // Logo cuadrado sin partes blancas visibles
+    logoContainer: {
+      width: 52,
+      height: 52,
+      borderRadius: 14,
+      backgroundColor: c.navy,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+      overflow: 'hidden',
+    },
 
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 34,
-  },
+    logoImage: {
+      width: 52,
+      height: 52,
+    },
 
-  logoGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
+    brandName: {
+      color: '#FFFFFF',
+      fontSize: 22,
+      fontWeight: '900',
+    },
 
-  logoContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
-    backgroundColor: COLORS.white,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-    overflow: "hidden",
-  },
+    brandSubtitle: {
+      color: '#64748B',
+      fontSize: 12,
+      marginTop: 2,
+    },
 
-  logoImage: {
-    width: 46,
-    height: 46,
-  },
+    authButtons: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
 
-  brandName: {
-    color: COLORS.white,
-    fontSize: 22,
-    fontWeight: "900",
-  },
+    loginButton: {
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.25)',
+    },
 
-  brandSubtitle: {
-    color: "#CBD5E1",
-    fontSize: 12,
-    marginTop: 2,
-  },
+    loginButtonText: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      fontWeight: '800',
+    },
 
-  authButtons: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+    registerButton: {
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      borderRadius: 999,
+      backgroundColor: c.green,
+    },
 
-  loginButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.35)",
-    marginRight: 8,
-  },
+    registerButtonText: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      fontWeight: '800',
+    },
 
-  loginButtonText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: "800",
-  },
+    // ─── Hero content ─────────────────────────────────────────────────────────
+    heroContent: {},
 
-  registerButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: COLORS.green,
-  },
+    heroEyebrow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 14,
+    },
 
-  registerButtonText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: "800",
-  },
+    heroEyebrowDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: c.green,
+    },
 
-  heroContent: {
-    marginTop: 4,
-  },
+    heroEyebrowText: {
+      color: c.green,
+      fontSize: 12,
+      fontWeight: '800',
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+    },
 
-  heroTitle: {
-    color: COLORS.white,
-    fontSize: 42,
-    fontWeight: "900",
-    lineHeight: 48,
-  },
+    heroTitle: {
+      color: '#FFFFFF',
+      fontSize: 44,
+      fontWeight: '900',
+      lineHeight: 50,
+      marginBottom: 16,
+    },
 
-  heroSubtitle: {
-    color: "#CBD5E1",
-    fontSize: 16,
-    lineHeight: 24,
-    marginTop: 16,
-  },
+    heroTitleAccent: {
+      color: c.green,
+    },
 
-  heroActions: {
-    flexDirection: "row",
-    marginTop: 28,
-  },
+    heroSubtitle: {
+      color: '#94A3B8',
+      fontSize: 16,
+      lineHeight: 25,
+      marginBottom: 32,
+    },
 
-  primaryButton: {
-    backgroundColor: COLORS.green,
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderRadius: 18,
-    marginRight: 12,
-  },
+    heroActions: {
+      flexDirection: 'row',
+      gap: 12,
+    },
 
-  primaryButtonText: {
-    color: COLORS.white,
-    fontWeight: "900",
-    fontSize: 14,
-  },
+    primaryButton: {
+      flex: 1,
+      backgroundColor: c.green,
+      paddingVertical: 16,
+      borderRadius: 18,
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 8,
+    },
 
-  secondaryButton: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-  },
+    primaryButtonText: {
+      color: '#FFFFFF',
+      fontWeight: '900',
+      fontSize: 15,
+    },
 
-  secondaryButtonText: {
-    color: COLORS.white,
-    fontWeight: "800",
-    fontSize: 14,
-  },
+    secondaryButton: {
+      flex: 1,
+      backgroundColor: 'rgba(255,255,255,0.07)',
+      paddingVertical: 16,
+      borderRadius: 18,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.15)',
+    },
 
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
+    secondaryButtonText: {
+      color: '#FFFFFF',
+      fontWeight: '800',
+      fontSize: 15,
+    },
 
-  balanceCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 28,
-    padding: 22,
-    marginTop: -24,
-    marginBottom: 30,
-    ...CARD_SHADOW,
-  },
+    // ─── Stats band ───────────────────────────────────────────────────────────
+    statsBand: {
+      flexDirection: 'row',
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      marginHorizontal: 22,
+      marginTop: -14,
+      marginBottom: 0,
+      borderRadius: 22,
+      paddingVertical: 18,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.08)',
+    },
 
-  balanceTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+    statBandItem: {
+      flex: 1,
+      alignItems: 'center',
+    },
 
-  cardLabel: {
-    color: COLORS.gray,
-    fontSize: 13,
-    fontWeight: "800",
-  },
+    statBandDivider: {
+      width: 1,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      marginVertical: 4,
+    },
 
-  balanceText: {
-    color: COLORS.navy,
-    fontSize: 40,
-    fontWeight: "900",
-    marginTop: 6,
-  },
+    statBandValue: {
+      color: '#FFFFFF',
+      fontSize: 20,
+      fontWeight: '900',
+    },
 
-  coinCircle: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: COLORS.mint,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+    statBandLabel: {
+      color: '#64748B',
+      fontSize: 11,
+      fontWeight: '600',
+      marginTop: 2,
+    },
 
-  coinEmoji: {
-    fontSize: 30,
-  },
+    // ─── Content section (fondo claro / oscuro según tema) ───────────────────
+    content: {
+      backgroundColor: c.bg,
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
+      marginTop: 24,
+      paddingHorizontal: 22,
+      paddingTop: 32,
+      paddingBottom: 48,
+    },
 
-  progressBar: {
-    height: 12,
-    backgroundColor: COLORS.mint,
-    borderRadius: 999,
-    marginTop: 22,
-    overflow: "hidden",
-  },
+    // ─── Sección "Gana coins" ─────────────────────────────────────────────────
+    sectionLabel: {
+      fontSize: 11,
+      fontWeight: '800',
+      color: c.green,
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+      marginBottom: 6,
+    },
 
-  progressFill: {
-    width: "72%",
-    height: "100%",
-    backgroundColor: COLORS.green,
-    borderRadius: 999,
-  },
+    sectionTitle: {
+      fontSize: 24,
+      fontWeight: '900',
+      color: c.textPrimary,
+      marginBottom: 20,
+    },
 
-  progressText: {
-    color: COLORS.gray,
-    fontSize: 12,
-    marginTop: 10,
-  },
+    earnGrid: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 14,
+    },
 
-  sectionHeader: {
-    marginBottom: 16,
-  },
+    earnCard: {
+      flex: 1,
+      backgroundColor: c.surface,
+      borderRadius: 22,
+      padding: 18,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: c.shadowOpacity,
+      shadowRadius: 12,
+      elevation: c.elevation,
+    },
 
-  sectionTitle: {
-    color: COLORS.navy,
-    fontSize: 23,
-    fontWeight: "900",
-  },
+    earnIconBox: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      backgroundColor: c.greenLight,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
 
-  statsRow: {
-    flexDirection: "row",
-    marginBottom: 14,
-  },
+    earnTitle: {
+      color: c.textPrimary,
+      fontSize: 15,
+      fontWeight: '900',
+      marginBottom: 4,
+    },
 
-  statCard: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-    borderRadius: 24,
-    padding: 18,
-    marginRight: 10,
-    ...CARD_SHADOW,
-  },
+    earnDesc: {
+      color: c.textSecondary,
+      fontSize: 12,
+      lineHeight: 17,
+      marginBottom: 10,
+    },
 
-  statIcon: {
-    fontSize: 30,
-    marginBottom: 10,
-  },
+    earnBadge: {
+      backgroundColor: c.greenLight,
+      borderRadius: 8,
+      paddingVertical: 3,
+      paddingHorizontal: 10,
+      alignSelf: 'flex-start',
+      borderWidth: 1,
+      borderColor: c.greenBorder,
+    },
 
-  statTitle: {
-    color: COLORS.navy,
-    fontSize: 17,
-    fontWeight: "900",
-  },
+    earnBadgeText: {
+      color: c.greenDark,
+      fontSize: 13,
+      fontWeight: '900',
+    },
 
-  statDescription: {
-    color: COLORS.gray,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 5,
-  },
+    earnCardWide: {
+      backgroundColor: c.surface,
+      borderRadius: 22,
+      padding: 18,
+      marginBottom: 30,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: c.shadowOpacity,
+      shadowRadius: 12,
+      elevation: c.elevation,
+    },
 
-  statReward: {
-    color: COLORS.green,
-    fontSize: 16,
-    fontWeight: "900",
-    marginTop: 8,
-  },
+    earnCardWideInfo: {
+      flex: 1,
+    },
 
-  activeCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 30,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    ...CARD_SHADOW,
-  },
+    earnCardWideTitle: {
+      color: c.textPrimary,
+      fontSize: 16,
+      fontWeight: '900',
+      marginBottom: 4,
+    },
 
-  activeInfo: {
-    flex: 1,
-    paddingRight: 16,
-  },
+    earnCardWideDesc: {
+      color: c.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+    },
 
-  activeTitle: {
-    color: COLORS.navy,
-    fontSize: 19,
-    fontWeight: "900",
-  },
+    // ─── Marketplace banner ───────────────────────────────────────────────────
+    marketplaceBanner: {
+      backgroundColor: c.navy,
+      borderRadius: 26,
+      padding: 22,
+      marginBottom: 32,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.25,
+      shadowRadius: 14,
+      elevation: 8,
+    },
 
-  activeSubtitle: {
-    color: COLORS.gray,
-    marginTop: 4,
-    lineHeight: 20,
-  },
+    marketplaceBannerLeft: {
+      flex: 1,
+    },
 
-  activeRewardBadge: {
-    backgroundColor: COLORS.mint,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-  },
+    marketplaceLabel: {
+      color: c.gold,
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+      marginBottom: 6,
+    },
 
-  activeRewardText: {
-    color: COLORS.greenDark,
-    fontSize: 16,
-    fontWeight: "900",
-  },
+    marketplaceTitle: {
+      color: '#FFFFFF',
+      fontSize: 20,
+      fontWeight: '900',
+      marginBottom: 6,
+    },
 
-  marketplaceCard: {
-    backgroundColor: COLORS.navy,
-    borderRadius: 28,
-    padding: 22,
-    marginBottom: 30,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    ...CARD_SHADOW,
-  },
+    marketplaceSubtitle: {
+      color: '#64748B',
+      fontSize: 13,
+      lineHeight: 19,
+    },
 
-  marketplaceLabel: {
-    color: COLORS.gold,
-    fontSize: 12,
-    fontWeight: "900",
-    marginBottom: 5,
-  },
+    marketplaceButton: {
+      backgroundColor: c.green,
+      paddingHorizontal: 18,
+      paddingVertical: 12,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  marketplaceTitle: {
-    color: COLORS.white,
-    fontSize: 21,
-    fontWeight: "900",
-    maxWidth: 210,
-  },
+    marketplaceButtonText: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '900',
+    },
 
-  marketplaceSubtitle: {
-    color: "#CBD5E1",
-    marginTop: 6,
-    lineHeight: 20,
-    maxWidth: 210,
-  },
+    // ─── Tutorial ─────────────────────────────────────────────────────────────
+    tutorialCard: {
+      backgroundColor: c.surface,
+      borderRadius: 26,
+      padding: 22,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: c.shadowOpacity,
+      shadowRadius: 14,
+      elevation: c.elevation,
+    },
 
-  marketplaceButton: {
-    backgroundColor: COLORS.green,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-    borderRadius: 999,
-  },
+    tutorialStep: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginBottom: 22,
+      gap: 16,
+    },
 
-  marketplaceButtonText: {
-    color: COLORS.white,
-    fontSize: 13,
-    fontWeight: "900",
-  },
+    tutorialStepLast: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 16,
+    },
 
-  stepsCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 28,
-    padding: 20,
-    ...CARD_SHADOW,
-  },
+    tutorialStepLeft: {
+      alignItems: 'center',
+    },
 
-  step: {
-    flexDirection: "row",
-    marginBottom: 22,
-  },
+    tutorialStepNum: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      backgroundColor: c.greenLight,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: c.greenBorder,
+    },
 
-  stepLast: {
-    flexDirection: "row",
-  },
+    tutorialStepNumText: {
+      fontSize: 18,
+      fontWeight: '900',
+      color: c.greenDark,
+    },
 
-  stepIconBox: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
-    backgroundColor: COLORS.mint,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 14,
-  },
+    tutorialConnector: {
+      width: 2,
+      flex: 1,
+      backgroundColor: c.greenBorder,
+      marginTop: 4,
+      marginBottom: -6,
+      alignSelf: 'center',
+      minHeight: 18,
+    },
 
-  stepIcon: {
-    fontSize: 24,
-  },
+    tutorialStepContent: {
+      flex: 1,
+      paddingTop: 4,
+    },
 
-  stepContent: {
-    flex: 1,
-  },
+    tutorialStepTitle: {
+      color: c.textPrimary,
+      fontSize: 16,
+      fontWeight: '900',
+      marginBottom: 4,
+    },
 
-  stepTitle: {
-    color: COLORS.navy,
-    fontSize: 16,
-    fontWeight: "900",
-  },
-
-  stepText: {
-    color: COLORS.gray,
-    marginTop: 4,
-    lineHeight: 20,
-  },
-});
+    tutorialStepText: {
+      color: c.textSecondary,
+      fontSize: 13,
+      lineHeight: 19,
+    },
+  });
+}

@@ -73,17 +73,14 @@ function AppContent() {
       .eq('id', userId)
       .single();
 
-    // AQUÍ SE OBTIENE EL SALDO REAL DESDE coin_transactions
-    // balance_after del último registro = saldo total acumulado del usuario
-    const { data: lastTx } = await supabase
-      .from('coin_transactions')
-      .select('balance_after')
+    // AQUÍ SE OBTIENE EL SALDO REAL DESDE wallets (fuente de verdad del balance)
+    const { data: wallet } = await supabase
+      .from('wallets')
+      .select('balance')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
       .maybeSingle();
 
-    const saldo = lastTx?.balance_after ?? 0;
+    const saldo = wallet?.balance ?? 0;
 
     return {
       name:   profile?.full_name ?? userEmail ?? 'Usuario',

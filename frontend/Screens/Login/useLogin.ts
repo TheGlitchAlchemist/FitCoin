@@ -64,18 +64,14 @@ export const useLogin = (onLoginSuccess?: UseLoginProps) => {
         console.warn('[useLogin] Perfil no encontrado:', profileError.message);
       }
 
-      // AQUÍ SE OBTIENE EL SALDO REAL DEL USUARIO DESDE coin_transactions
-      // El saldo es el balance_after de la transacción más reciente.
-      // Si no hay transacciones aún, el saldo es 0.
-      const { data: lastTx } = await supabase
-        .from('coin_transactions')
-        .select('balance_after')
+      // AQUÍ SE OBTIENE EL SALDO REAL DEL USUARIO DESDE wallets
+      const { data: wallet } = await supabase
+        .from('wallets')
+        .select('balance')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
         .maybeSingle();
 
-      const saldo = lastTx?.balance_after ?? 0;
+      const saldo = wallet?.balance ?? 0;
 
       // AQUÍ SE MANDA AL DASHBOARD DESPUÉS DEL LOGIN
       if (onLoginSuccess) {

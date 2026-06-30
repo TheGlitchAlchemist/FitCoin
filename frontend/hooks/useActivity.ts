@@ -130,17 +130,14 @@ export function useActivity(baseSaldo: number = 0) {
       const today = new Date().toISOString().split('T')[0];
 
       const { data: result, error } = await supabase.rpc('sync_step_activity', {
-        p_user_id:          user.id,
-        p_provider:         getProvider(),
-        p_date:             today,
-        p_steps:            steps,
-        p_distance_meters:  Math.round(m.distanceKm * 1000),
-        p_calories:         m.calories,
-        p_active_minutes:   m.activeMin,
-        p_coins_calculated: m.coinsToday,
-        p_raw_data_hash:    `${today}-${steps}`,
-        p_status:           STATUS_SYNCED,
-        p_transaction_type: TX_TYPE_EARN,
+        p_provider:        getProvider(),
+        p_date:            today,
+        p_steps:           steps,
+        p_distance_meters: Math.round(m.distanceKm * 1000),
+        p_calories:        m.calories,
+        p_active_minutes:  m.activeMin,
+        p_coins:           m.coinsToday,
+        p_hash:            `${today}-${steps}`,
       });
 
       if (error) {
@@ -260,18 +257,16 @@ export function useActivity(baseSaldo: number = 0) {
             }
           }
 
-          // Leer saldo actual de coin_transactions
-          const { data: lastTx } = await supabase
-            .from('coin_transactions')
-            .select('balance_after')
+          // Leer saldo actual desde wallets (fuente de verdad)
+          const { data: wallet } = await supabase
+            .from('wallets')
+            .select('balance')
             .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
             .maybeSingle();
 
-          if (lastTx) {
-            syncedBalance.current = lastTx.balance_after ?? 0;
-            setTotalCoins(lastTx.balance_after ?? 0);
+          if (wallet) {
+            syncedBalance.current = wallet.balance ?? 0;
+            setTotalCoins(wallet.balance ?? 0);
           }
         }
       } catch (e) {

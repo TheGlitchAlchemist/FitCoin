@@ -1,6 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- FitCoin — Sistema antifraude de pasos (server-side)
--- Ejecutar COMPLETO en Supabase → SQL Editor
+-- ⚠️ EJECUTAR PRIMERO supabase/paso1_enum.sql (en una query separada).
+-- Después ejecutar este archivo COMPLETO en Supabase → SQL Editor
 --
 -- Qué hace:
 --   1. Agrega columnas de control diario a activity_daily_summaries
@@ -90,23 +91,13 @@ create index if not exists activity_daily_user_idx
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. coin_transactions: tipo de movimiento
+--    NOTA: la columna `type` ya existe como enum `transaction_type`.
+--    Los valores nuevos del enum se agregan en supabase/paso1_enum.sql,
+--    que debe ejecutarse ANTES que este script.
 -- ─────────────────────────────────────────────────────────────────────────────
 alter table public.coin_transactions
   add column if not exists amount      integer,
-  add column if not exists description text,
-  add column if not exists type        text not null default 'earned_activity';
-
--- Normalizar tipos viejos antes de aplicar el check
-update public.coin_transactions
-set type = 'earned_activity'
-where type is null
-   or type not in ('earned_activity', 'penalty_suspicious_activity', 'spent_redemption');
-
-alter table public.coin_transactions
-  drop constraint if exists coin_transactions_type_check;
-alter table public.coin_transactions
-  add constraint coin_transactions_type_check
-  check (type in ('earned_activity', 'penalty_suspicious_activity', 'spent_redemption'));
+  add column if not exists description text;
 
 -- Defaults seguros para columnas NOT NULL sin default (igual que arriba)
 do $$

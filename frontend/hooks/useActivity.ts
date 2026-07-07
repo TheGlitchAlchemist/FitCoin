@@ -65,8 +65,13 @@ function displayMetrics(steps: number) {
   };
 }
 
+// Fecha LOCAL del dispositivo (no UTC): en México (UTC-6), toISOString()
+// devolvía la fecha de mañana después de las 6pm y el día se "reiniciaba" solo.
 function todayStr() {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  const m   = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
 }
 
 function todayRange() {
@@ -99,6 +104,17 @@ export function useActivity(baseSaldo: number = 0) {
 
   const dateRef  = useRef(todayStr());
   const syncBusy = useRef(false);
+
+  // En un APK instalado nadie ve console.warn: el primer error de cada sesión
+  // se muestra en un Alert para poder diagnosticar en el dispositivo.
+  const errorAlertShown = useRef(false);
+  const reportError = useCallback((contexto: string, mensaje: string) => {
+    console.warn(`[useActivity] ${contexto}:`, mensaje);
+    if (!errorAlertShown.current && isMounted.current) {
+      errorAlertShown.current = true;
+      Alert.alert('Error de sincronización', `${contexto}\n\n${mensaje}`);
+    }
+  }, []);
 
   // ── Pasos mostrados en pantalla (server + pendientes de la sesión) ────────
   const currentSteps = useCallback(() => {
@@ -163,8 +179,8 @@ export function useActivity(baseSaldo: number = 0) {
         .maybeSingle(),
     ]);
 
-    if (recRes.error)    console.warn('[useActivity] Error leyendo actividad:', recRes.error.message);
-    if (walletRes.error) console.warn('[useActivity] Error leyendo wallet:', walletRes.error.message);
+    if (recRes.error)    reportError('Lectura de actividad diaria', recRes.error.message);
+    if (walletRes.error) reportError('Lectura de wallet', walletRes.error.message);
 
     if (!isMounted.current) return;
 
@@ -177,7 +193,7 @@ export function useActivity(baseSaldo: number = 0) {
       serverCoins.current = recRes.data.fitcoins_earned ?? 0;
     }
     updateUI(currentSteps());
-  }, [currentSteps, updateUI]);
+  }, [currentSteps, reportError, updateUI]);
 
   // ── SYNC: la única vía para generar (o perder) FitCoins ───────────────────
   const syncActivity = useCallback(async (showAlert: boolean = true) => {
@@ -193,7 +209,7 @@ export function useActivity(baseSaldo: number = 0) {
       });
 
       if (error) {
-        console.warn('[useActivity] RPC error:', error.message);
+        reportError('RPC sync_daily_activity', error.message);
         return;
       }
 
@@ -226,11 +242,11 @@ export function useActivity(baseSaldo: number = 0) {
         console.log(`[useActivity] +${r.coins_awarded} FC → ${r.new_balance} FC`);
       }
     } catch (e) {
-      console.warn('[useActivity] Error de red en sync:', e);
+      reportError('Red (sync)', e instanceof Error ? e.message : String(e));
     } finally {
       syncBusy.current = false;
     }
-  }, [checkDayChange, currentSteps, updateUI]);
+  }, [checkDayChange, currentSteps, reportError, updateUI]);
 
   // ── Pull-to-refresh: sync + relectura completa ─────────────────────────────
   const refreshData = useCallback(async () => {
@@ -324,7 +340,12 @@ export function useActivity(baseSaldo: number = 0) {
 
       startWatch();
 
-      // 5) Sync periódico (aquí es donde el servidor valida y otorga FC)
+      // 5) SYNC DE LÍNEA BASE: marca last_sync_at = ahora en el servidor.
+      // Sin esto, el primer sync del día medía la tasa contra una ventana
+      // de horas y cualquier cantidad de pasos falsos pasaba como válida.
+      syncActivity(false);
+
+      // 6) Sync periódico (aquí es donde el servidor valida y otorga FC)
       syncTimer = setInterval(() => {
         syncActivity(true);
       }, SYNC_INTERVAL_MS);

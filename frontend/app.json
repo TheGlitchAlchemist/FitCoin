@@ -2,7 +2,7 @@
   "expo": {
     "name": "FitCoin",
     "slug": "fitcoin-app",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
 
@@ -24,6 +24,7 @@
 
     "android": {
       "package": "com.fitcoin.app",
+      "versionCode": 2,
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

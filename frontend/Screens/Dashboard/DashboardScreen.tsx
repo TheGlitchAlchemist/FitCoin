@@ -272,6 +272,11 @@ export default function DashboardScreen({ userData, onLogout }: DashboardScreenP
         <Ionicons name="log-out-outline" size={18} color="#EF4444" />
         <Text style={styles.logoutButtonText}>Cerrar sesión</Text>
       </TouchableOpacity>
+
+      {/* Permite verificar en el dispositivo qué APK está instalado */}
+      <Text style={{ textAlign: 'center', color: colors.textMuted, fontSize: 12, marginTop: 14 }}>
+        FitCoin v1.1.0
+      </Text>
     </ScrollView>
   );
 

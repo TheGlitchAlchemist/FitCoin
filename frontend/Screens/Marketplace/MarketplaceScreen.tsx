@@ -3,6 +3,7 @@ import {
   Alert,
   ImageBackground,
   Modal,
+  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -53,9 +54,11 @@ const REWARDS: Reward[] = [
 
 type Props = {
   totalCoins: number;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 };
 
-export default function MarketplaceScreen({ totalCoins }: Props) {
+export default function MarketplaceScreen({ totalCoins, refreshing = false, onRefresh }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
@@ -65,6 +68,15 @@ export default function MarketplaceScreen({ totalCoins }: Props) {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.green]}
+            tintColor={colors.green}
+            progressBackgroundColor={colors.surface}
+          />
+        }
       >
         {/* Header */}
         <View style={styles.headerRow}>

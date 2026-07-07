@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
-import { ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshControl, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import CanjesScreen from '../Canjes/CanjesScreen';
 import MarketplaceScreen from '../Marketplace/MarketplaceScreen';
+import ProgressRing from '../../components/ProgressRing';
 import { makeStyles } from './DashboardStyles';
 import { DashboardTab, useDashboard } from './useDashboard';
 import { useActivity } from '../../hooks/useActivity';
@@ -66,14 +67,13 @@ function formatDistance(km: number): string {
 
 export default function DashboardScreen({ userData, onLogout }: DashboardScreenProps) {
   const { colors, isDark, toggleTheme } = useTheme();
-  const styles  = useMemo(() => makeStyles(colors), [colors]);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { activeTab, setActiveTab } = useDashboard();
 
   const userName  = userData?.nombre || userData?.name || 'Usuario';
   const baseSaldo = userData?.saldo ?? 0;
-  const { activity, totalCoins } = useActivity(baseSaldo);
+  const { activity, totalCoins, refreshing, refreshData } = useActivity(baseSaldo);
 
-  // Inicial del nombre para el avatar
   const initial = userName.charAt(0).toUpperCase();
 
   // ─── Home ──────────────────────────────────────────────────────────────────
@@ -82,6 +82,15 @@ export default function DashboardScreen({ userData, onLogout }: DashboardScreenP
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={refreshData}
+          colors={[colors.green]}
+          tintColor={colors.green}
+          progressBackgroundColor={colors.surface}
+        />
+      }
     >
       <View style={styles.header}>
         <View style={styles.headerTextContainer}>
@@ -93,28 +102,27 @@ export default function DashboardScreen({ userData, onLogout }: DashboardScreenP
         </TouchableOpacity>
       </View>
 
-      {/* Anillo de progreso */}
       <View style={styles.progressCard}>
         {!activity.isAvailable && !activity.isLoading && activity.error && (
           <Text style={styles.sensorWarning}>{activity.error}</Text>
         )}
-        <View style={styles.progressCircle}>
-          <Text style={styles.progressPercent}>{activity.progressPct}%</Text>
-          <Text style={styles.stepsText}>{activity.steps.toLocaleString()} pasos</Text>
-          <Text style={styles.fitCoinsValue}>{totalCoins}</Text>
-          <View style={styles.fitCoinsLabelContainer}>
-            <View style={styles.coinDot} />
-            <Text style={styles.fitCoinsLabel}>FitCoins</Text>
-          </View>
-        </View>
+        <ProgressRing
+          pct={activity.progressPct}
+          steps={activity.steps}
+          coins={totalCoins}
+          color={colors.green}
+          trackColor={colors.greenBorder}
+          textPrimary={colors.textPrimary}
+          textSecondary={colors.textSecondary}
+          gold={colors.gold}
+        />
         <View style={styles.goalRow}>
           <Text style={styles.goalText}>
-            Meta: 10,000 pasos · Hoy ganas {activity.coinsToday} FC
+            Meta: 12,000 pasos · {activity.coinsToday}/12 FC hoy
           </Text>
         </View>
       </View>
 
-      {/* Stats */}
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
           <Ionicons name="flame-outline" size={18} color="#F97316" style={styles.statIcon} />
@@ -133,7 +141,6 @@ export default function DashboardScreen({ userData, onLogout }: DashboardScreenP
         </View>
       </View>
 
-      {/* Accesos rápidos */}
       <Text style={styles.sectionTitle}>Accesos rápidos</Text>
       <View style={styles.quickActionsGrid}>
         {QUICK_ACTIONS.map((action) => (
@@ -158,8 +165,16 @@ export default function DashboardScreen({ userData, onLogout }: DashboardScreenP
       style={styles.container}
       contentContainerStyle={styles.profileContainer}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={refreshData}
+          colors={[colors.green]}
+          tintColor={colors.green}
+          progressBackgroundColor={colors.surface}
+        />
+      }
     >
-      {/* Avatar + nombre */}
       <View style={styles.profileHeader}>
         <View style={styles.avatarCircle}>
           <Text style={styles.avatarInitial}>{initial}</Text>
@@ -168,9 +183,7 @@ export default function DashboardScreen({ userData, onLogout }: DashboardScreenP
         <Text style={styles.profileRole}>Miembro FitCoin</Text>
       </View>
 
-      {/* Tarjeta de configuración */}
       <View style={styles.settingsCard}>
-        {/* Modo oscuro */}
         <View style={[styles.settingsRow, styles.settingsRowBorder]}>
           <View style={styles.settingsRowLeft}>
             <View style={styles.settingsIconBox}>
@@ -192,7 +205,6 @@ export default function DashboardScreen({ userData, onLogout }: DashboardScreenP
           />
         </View>
 
-        {/* Notificaciones (placeholder) */}
         <View style={[styles.settingsRow, styles.settingsRowBorder]}>
           <View style={styles.settingsRowLeft}>
             <View style={styles.settingsIconBox}>
@@ -203,7 +215,6 @@ export default function DashboardScreen({ userData, onLogout }: DashboardScreenP
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </View>
 
-        {/* Wearables (placeholder) */}
         <View style={styles.settingsRow}>
           <View style={styles.settingsRowLeft}>
             <View style={styles.settingsIconBox}>
@@ -215,7 +226,6 @@ export default function DashboardScreen({ userData, onLogout }: DashboardScreenP
         </View>
       </View>
 
-      {/* Stats rápidos del usuario */}
       <View style={styles.settingsCard}>
         <View style={[styles.settingsRow, styles.settingsRowBorder]}>
           <View style={styles.settingsRowLeft}>
@@ -237,7 +247,7 @@ export default function DashboardScreen({ userData, onLogout }: DashboardScreenP
           <Text style={styles.settingsValue}>{totalCoins} FC</Text>
         </View>
 
-        <View style={styles.settingsRow}>
+        <View style={[styles.settingsRow, styles.settingsRowBorder]}>
           <View style={styles.settingsRowLeft}>
             <View style={styles.settingsIconBox}>
               <Ionicons name="map-outline" size={18} color="#3B82F6" />
@@ -246,9 +256,18 @@ export default function DashboardScreen({ userData, onLogout }: DashboardScreenP
           </View>
           <Text style={styles.settingsValue}>{formatDistance(activity.distanceKm)}</Text>
         </View>
+
+        <View style={styles.settingsRow}>
+          <View style={styles.settingsRowLeft}>
+            <View style={styles.settingsIconBox}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={colors.textSecondary} />
+            </View>
+            <Text style={styles.settingsLabel}>Tipo de cuenta</Text>
+          </View>
+          <Text style={styles.settingsValue}>Normal · máx 12 FC/día</Text>
+        </View>
       </View>
 
-      {/* Cerrar sesión */}
       <TouchableOpacity style={styles.logoutButton} onPress={onLogout} activeOpacity={0.85}>
         <Ionicons name="log-out-outline" size={18} color="#EF4444" />
         <Text style={styles.logoutButtonText}>Cerrar sesión</Text>
@@ -257,16 +276,31 @@ export default function DashboardScreen({ userData, onLogout }: DashboardScreenP
   );
 
   const renderContent = () => {
-    if (activeTab === 'marketplace') return <MarketplaceScreen totalCoins={totalCoins} />;
-    if (activeTab === 'redemptions') return <CanjesScreen />;
-    if (activeTab === 'profile')     return renderProfileTab();
+    if (activeTab === 'marketplace') {
+      return (
+        <MarketplaceScreen
+          totalCoins={totalCoins}
+          refreshing={refreshing}
+          onRefresh={refreshData}
+        />
+      );
+    }
+    if (activeTab === 'redemptions') {
+      return (
+        <CanjesScreen
+          refreshing={refreshing}
+          onRefresh={refreshData}
+        />
+      );
+    }
+    if (activeTab === 'profile') return renderProfileTab();
     return renderHomeTab();
   };
 
   // ─── Bottom nav ────────────────────────────────────────────────────────────
   const renderTabButton = (tab: DashboardTab) => {
-    const isActive  = activeTab === tab;
-    const iconName  = isActive ? TAB_ICONS[tab].active : TAB_ICONS[tab].inactive;
+    const isActive = activeTab === tab;
+    const iconName = isActive ? TAB_ICONS[tab].active : TAB_ICONS[tab].inactive;
     return (
       <TouchableOpacity
         key={tab}

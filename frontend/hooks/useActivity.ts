@@ -1,34 +1,30 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// ARCHIVO: hooks/useActivity.ts
-//
-// FIXES EN ESTA VERSIÓN:
-//   1. Android restaura los pasos del día desde Supabase al re-login.
-//      watchStepCount empieza en 0 pero se suma a los pasos ya guardados.
-//   2. Sync forzado al ir al background (usuario sale de la app o cierra sesión).
-//   3. Sync forzado antes del logout via activitySync.flushActivitySync().
-//   4. Intervalo de sync reducido a 30s para minimizar pérdida de datos.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import { Pedometer } from 'expo-sensors';
 import { supabase } from '../lib/supabase';
 import { clearActivitySync, registerActivitySync } from '../lib/activitySync';
 
-// ─── Configuración ────────────────────────────────────────────────────────────
-const COINS_PER_KM       = 5;
-const DAILY_STEP_GOAL    = 10_000;
-const STEP_LENGTH_M      = 0.762;
-const KCAL_PER_STEP      = 0.04;
-const SYNC_INTERVAL_MS   = 30_000;  // cada 30s (antes era 60s)
-const MIN_NEW_STEPS_SYNC = 20;
-const HEALTH_POLL_MS     = 30_000;  // solo iOS
+// ─── Fórmula de monedas ───────────────────────────────────────────────────────
+const STEPS_PER_COIN  = 1_000;
+const DAILY_FC_CAP    = 12;
+const DAILY_STEP_GOAL = 12_000;
+const STEP_LENGTH_M   = 0.762;
+const KCAL_PER_STEP   = 0.04;
 
-// ─── Enums verificados de Supabase ───────────────────────────────────────────
-const PROVIDER_IOS      = 'apple_healthkit';
-const PROVIDER_ANDROID  = 'google_health_connect';
-const STATUS_SYNCED     = 'approved';
-const TX_TYPE_EARN      = 'earn_activity';
+// ─── Sync ─────────────────────────────────────────────────────────────────────
+const SYNC_INTERVAL_MS = 30_000;
+const HEALTH_POLL_MS   = 30_000;
+
+// ─── Anti-shake ───────────────────────────────────────────────────────────────
+// Caminar normal: ~1.5 pasos/seg. Correr rápido: ~2.5 pasos/seg.
+// Agitar genera 20-100 pasos en < 500 ms → siempre rechazado con estos límites.
+const MAX_STEPS_PER_SECOND = 1.5;
+// Si el callback llega en menos de este tiempo, solo se permite 1 paso máximo.
+// Ningún movimiento físico real genera pasos en < 300 ms.
+const MIN_ELAPSED_MS = 300;
+
+const PROVIDER_IOS     = 'apple_healthkit';
+const PROVIDER_ANDROID = 'google_health_connect';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -52,11 +48,15 @@ const INITIAL: ActivityData = {
 
 function computeMetrics(steps: number) {
   const distanceKm  = (steps * STEP_LENGTH_M) / 1000;
-  const coinsToday  = Math.floor(distanceKm * COINS_PER_KM);
+  const coinsToday  = Math.min(DAILY_FC_CAP, Math.floor(steps / STEPS_PER_COIN));
   const calories    = Math.round(steps * KCAL_PER_STEP);
   const progressPct = Math.min(100, Math.round((steps / DAILY_STEP_GOAL) * 100));
   const activeMin   = Math.round(steps / 100);
   return { distanceKm, coinsToday, calories, progressPct, activeMin };
+}
+
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
 }
 
 function todayRange() {
@@ -74,27 +74,25 @@ function getProvider() {
 export function useActivity(baseSaldo: number = 0) {
   const [activity, setActivity]     = useState<ActivityData>(INITIAL);
   const [totalCoins, setTotalCoins] = useState(baseSaldo);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const watchSub    = useRef<ReturnType<typeof Pedometer.watchStepCount> | null>(null);
-  const isMounted   = useRef(true);
+  const watchSub  = useRef<ReturnType<typeof Pedometer.watchStepCount> | null>(null);
+  const isMounted = useRef(true);
 
-  // iOS: pasos históricos de HealthKit al abrir
-  const iosBase     = useRef(0);
+  const iosBase           = useRef(0);
+  const androidSyncedBase = useRef(0);
 
-  // Android: pasos ya guardados en Supabase (base para restaurar al re-login)
-  // + pasos nuevos de esta sesión que aún no están en Supabase
-  const androidSyncedBase   = useRef(0); // pasos guardados en Supabase hoy
-  const androidSessionDelta = useRef(0); // pasos nuevos desde que inició la sesión
+  const lastSyncedSteps = useRef(0);
+  const lastSyncedCoins = useRef(0);
+  const syncedBalance   = useRef(baseSaldo);
+  const currentStepsRef = useRef(0);
 
-  // Sync tracking
-  const lastSyncedSteps  = useRef(0);
-  const lastSyncedCoins  = useRef(0);
-  const syncedBalance    = useRef(baseSaldo);
+  // ── Anti-shake: contador propio (independiente del acumulador del pedómetro)
+  const validatedSessionSteps = useRef(0);
+  const lastRawSessionSteps   = useRef(0);
+  const lastWatchCallbackTime = useRef(Date.now());
 
-  // Referencia a los pasos actuales (para sync forzado)
-  const currentStepsRef  = useRef(0);
-
-  // ── Aplicar pasos al estado ────────────────────────────────────────────────
+  // ── applySteps ────────────────────────────────────────────────────────────
   const applySteps = useCallback((steps: number) => {
     if (!isMounted.current) return;
     currentStepsRef.current = steps;
@@ -103,92 +101,154 @@ export function useActivity(baseSaldo: number = 0) {
       ...prev, steps, ...m,
       isAvailable: true, isLoading: false, error: null,
     }));
-    const newCoins = Math.max(0, m.coinsToday - lastSyncedCoins.current);
-    setTotalCoins(syncedBalance.current + newCoins);
+    const pendingCoins = Math.max(0, m.coinsToday - lastSyncedCoins.current);
+    setTotalCoins(syncedBalance.current + pendingCoins);
   }, []);
 
-  // ── iOS: leer HealthKit ────────────────────────────────────────────────────
+  // ── iOS: HealthKit ────────────────────────────────────────────────────────
   const readIosHealth = useCallback(async (): Promise<number> => {
     try {
       const { start, end } = todayRange();
       const { steps } = await Pedometer.getStepCountAsync(start, end);
       return steps;
-    } catch {
-      return 0;
-    }
+    } catch { return 0; }
   }, []);
 
-  // ── Sync a Supabase ────────────────────────────────────────────────────────
-  const syncToSupabase = useCallback(async (steps: number): Promise<void> => {
-    if (steps - lastSyncedSteps.current < MIN_NEW_STEPS_SYNC) return;
+  // ── Leer wallet + actividad del día desde Supabase ────────────────────────
+  const fetchSupabaseData = useCallback(async (userId: string) => {
+    const [{ data: rec }, { data: wallet }] = await Promise.all([
+      supabase
+        .from('activity_daily_summaries')
+        .select('steps, coins_awarded')
+        .eq('user_id', userId)
+        .eq('provider', getProvider())
+        .eq('activity_date', todayStr())
+        .maybeSingle(),
+      supabase
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', userId)
+        .maybeSingle(),
+    ]);
+    return { rec, wallet };
+  }, []);
 
+  // ── Aplicar datos de Supabase al estado local ─────────────────────────────
+  const applySupabaseData = useCallback((
+    rec:    { steps: number; coins_awarded: number | null } | null,
+    wallet: { balance: number | null } | null,
+  ) => {
+    if (wallet) {
+      const bal = wallet.balance ?? 0;
+      syncedBalance.current = bal;
+      if (isMounted.current) setTotalCoins(bal);
+    }
+    if (rec && rec.steps > 0) {
+      lastSyncedSteps.current = rec.steps;
+      lastSyncedCoins.current = rec.coins_awarded ?? 0;
+      if (Platform.OS === 'android') {
+        androidSyncedBase.current   = rec.steps;
+        validatedSessionSteps.current = 0; // reiniciar delta de sesión
+      }
+      applySteps(rec.steps);
+    }
+  }, [applySteps]);
+
+  // ── Sync a Supabase (con threshold mínimo) ────────────────────────────────
+  const syncToSupabase = useCallback(async (steps: number, force = false): Promise<void> => {
+    const delta = steps - lastSyncedSteps.current;
+    if (!force && delta < 30) return;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
-      const m     = computeMetrics(steps);
-      const today = new Date().toISOString().split('T')[0];
-
+      const m = computeMetrics(steps);
       const { data: result, error } = await supabase.rpc('sync_step_activity', {
         p_provider:        getProvider(),
-        p_date:            today,
+        p_date:            todayStr(),
         p_steps:           steps,
         p_distance_meters: Math.round(m.distanceKm * 1000),
         p_calories:        m.calories,
         p_active_minutes:  m.activeMin,
         p_coins:           m.coinsToday,
-        p_hash:            `${today}-${steps}`,
+        p_hash:            `${todayStr()}-${steps}`,
       });
-
-      if (error) {
-        console.warn('[useActivity] RPC error:', error.message);
-        return;
-      }
-
+      if (error) { console.warn('[useActivity] RPC error:', error.message); return; }
       if (result) {
-        const { new_balance, coins_awarded } = result as {
-          new_balance: number;
-          coins_awarded: number;
-        };
+        const { new_balance, coins_awarded } = result as { new_balance: number; coins_awarded: number };
         lastSyncedSteps.current = steps;
         lastSyncedCoins.current = m.coinsToday;
         syncedBalance.current   = new_balance;
-        // Actualizar androidSyncedBase para que el próximo re-login tenga la base correcta
-        if (Platform.OS === 'android') {
-          androidSyncedBase.current = steps;
-        }
-        setTotalCoins(new_balance);
-        if (coins_awarded > 0) {
-          console.log(`[useActivity] +${coins_awarded} FC → saldo: ${new_balance} FC`);
-        }
+        if (Platform.OS === 'android') androidSyncedBase.current = steps;
+        if (isMounted.current) setTotalCoins(new_balance);
+        if (coins_awarded > 0) console.log(`[useActivity] +${coins_awarded} FC → ${new_balance} FC`);
       }
-    } catch (e) {
-      console.warn('[useActivity] Error de red:', e);
-    }
+    } catch (e) { console.warn('[useActivity] Error de red:', e); }
   }, []);
 
-  // ── Sync forzado (para logout y background) ───────────────────────────────
-  const forceSyncNow = useCallback(async (): Promise<void> => {
-    await syncToSupabase(currentStepsRef.current);
+  const forceSyncNow = useCallback(async () => {
+    await syncToSupabase(currentStepsRef.current, true);
   }, [syncToSupabase]);
 
-  // ── Iniciar suscripción watchStepCount ────────────────────────────────────
+  // ── Refresh manual (pull-to-refresh) ─────────────────────────────────────
+  // 1. Sincroniza pasos pendientes aunque no lleguen al mínimo
+  // 2. Lee los valores actualizados de Supabase
+  const refreshData = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Forzar sync primero para que wallet tenga el saldo más reciente
+      await syncToSupabase(currentStepsRef.current, true);
+
+      // Leer valores frescos
+      const { rec, wallet } = await fetchSupabaseData(user.id);
+      applySupabaseData(rec, wallet);
+    } catch (e) {
+      console.warn('[useActivity] Error en refresh:', e);
+    } finally {
+      if (isMounted.current) setRefreshing(false);
+    }
+  }, [applySupabaseData, fetchSupabaseData, syncToSupabase]);
+
+  // ── Watch con anti-shake mejorado ─────────────────────────────────────────
   const startWatch = useCallback(() => {
     watchSub.current?.remove();
     watchSub.current = null;
 
-    watchSub.current = Pedometer.watchStepCount(({ steps: sessionSteps }) => {
+    validatedSessionSteps.current = 0;
+    lastRawSessionSteps.current   = 0;
+    lastWatchCallbackTime.current = Date.now();
+
+    watchSub.current = Pedometer.watchStepCount(({ steps: rawSessionSteps }) => {
       if (!isMounted.current) return;
 
+      const now       = Date.now();
+      const elapsedMs = Math.max(1, now - lastWatchCallbackTime.current);
+      const rawDelta  = rawSessionSteps - lastRawSessionSteps.current;
+
+      lastWatchCallbackTime.current = now;
+      lastRawSessionSteps.current   = rawSessionSteps;
+
+      if (rawDelta <= 0) return;
+
+      // Si el callback llegó en < MIN_ELAPSED_MS solo se permite 1 paso.
+      // Caminar no produce pasos en 300 ms. Shake siempre llega más rápido.
+      const maxAllowed = elapsedMs < MIN_ELAPSED_MS
+        ? 1
+        : Math.ceil((elapsedMs / 1000) * MAX_STEPS_PER_SECOND);
+
+      if (rawDelta > maxAllowed) {
+        // Spike — descartado completamente, NO se acumula
+        return;
+      }
+
+      validatedSessionSteps.current += rawDelta;
+
       if (Platform.OS === 'ios') {
-        // iOS: sessionSteps = pasos desde que inició el watch
-        // Se suma a los pasos históricos de HealthKit
-        applySteps(iosBase.current + sessionSteps);
+        applySteps(iosBase.current + validatedSessionSteps.current);
       } else {
-        // Android: sessionSteps = pasos desde que inició el watch (empieza en 0)
-        // Se suma a los pasos ya guardados en Supabase (para restaurar tras re-login)
-        androidSessionDelta.current = sessionSteps;
-        applySteps(androidSyncedBase.current + sessionSteps);
+        applySteps(androidSyncedBase.current + validatedSessionSteps.current);
       }
     });
   }, [applySteps]);
@@ -197,148 +257,98 @@ export function useActivity(baseSaldo: number = 0) {
   useEffect(() => {
     isMounted.current = true;
     let pollTimer: ReturnType<typeof setInterval> | null = null;
-    let syncTimer: ReturnType<typeof setInterval> | null = null;
+    let syncTimer:  ReturnType<typeof setInterval> | null = null;
 
     const init = async () => {
-      // 1. Pedir permiso (crítico en Android 10+)
+      // Paso 0: leer saldo e historial ANTES de pedir permisos
+      // El usuario ve los FC correctos en < 400 ms desde que abre la app.
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { rec, wallet } = await fetchSupabaseData(user.id);
+          applySupabaseData(rec, wallet);
+        }
+      } catch (e) {
+        console.warn('[useActivity] Error init Supabase:', e);
+      }
+
+      // Paso 1: permisos
       const { status } = await Pedometer.requestPermissionsAsync();
       if (status !== 'granted') {
         if (isMounted.current) {
           setActivity(prev => ({
-            ...prev,
-            isAvailable: false,
-            isLoading: false,
-            error: 'Permiso de actividad física denegado.\nVe a Ajustes → Apps → FitCoin → Permisos → Actividad física.',
+            ...prev, isAvailable: false, isLoading: false,
+            error: 'Permiso de actividad física denegado.',
           }));
         }
         return;
       }
 
-      // 2. Verificar sensor de hardware
+      // Paso 2: sensor
       const available = await Pedometer.isAvailableAsync();
       if (!available) {
         if (isMounted.current) {
           setActivity(prev => ({
-            ...prev,
-            isAvailable: false,
-            isLoading: false,
+            ...prev, isAvailable: false, isLoading: false,
             error: 'Tu dispositivo no tiene sensor de pasos.',
           }));
         }
         return;
       }
 
-      // 3. Leer datos de hoy desde Supabase
-      //    CRÍTICO: esto restaura los pasos y monedas del día si el usuario
-      //    cerró sesión y volvió a entrar.
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const today = new Date().toISOString().split('T')[0];
-
-          const { data: rec } = await supabase
-            .from('activity_daily_summaries')
-            .select('steps, coins_awarded')
-            .eq('user_id', user.id)
-            .eq('provider', getProvider())
-            .eq('activity_date', today)
-            .maybeSingle();
-
-          if (rec && rec.steps > 0) {
-            // Hay pasos guardados de hoy → restaurar como base
-            lastSyncedSteps.current = rec.steps;
-            lastSyncedCoins.current = rec.coins_awarded ?? 0;
-
-            if (Platform.OS === 'android') {
-              // Android: los pasos de Supabase son la base
-              // watchStepCount sumará pasos NUEVOS de esta sesión encima
-              androidSyncedBase.current = rec.steps;
-              applySteps(rec.steps); // mostrar inmediatamente los pasos restaurados
-            }
-          }
-
-          // Leer saldo actual desde wallets (fuente de verdad)
-          const { data: wallet } = await supabase
-            .from('wallets')
-            .select('balance')
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-          if (wallet) {
-            syncedBalance.current = wallet.balance ?? 0;
-            setTotalCoins(wallet.balance ?? 0);
-          }
-        }
-      } catch (e) {
-        console.warn('[useActivity] Error leyendo Supabase al init:', e);
-      }
-
-      // 4. iOS: leer historial de HealthKit
+      // Paso 3: conteo
       if (Platform.OS === 'ios') {
         const historical = await readIosHealth();
         iosBase.current = historical;
         applySteps(historical);
-
-        // Polling iOS cada 30s
         pollTimer = setInterval(async () => {
           if (!isMounted.current) return;
           const fresh = await readIosHealth();
-          if (fresh > 0) {
-            iosBase.current = fresh;
-            applySteps(fresh);
-          }
+          if (fresh > 0) { iosBase.current = fresh; applySteps(fresh); }
         }, HEALTH_POLL_MS);
-
       } else {
-        // Android: mostrar estado listo (watchStepCount hará el trabajo)
         if (isMounted.current) {
-          setActivity(prev => ({
-            ...prev,
-            isAvailable: true,
-            isLoading: false,
-          }));
+          setActivity(prev => ({ ...prev, isAvailable: true, isLoading: false }));
         }
       }
 
-      // 5. Iniciar watch en tiempo real
       startWatch();
 
-      // 6. Sync periódico (cada 30s)
       syncTimer = setInterval(() => {
         syncToSupabase(currentStepsRef.current);
       }, SYNC_INTERVAL_MS);
 
-      // 7. Registrar función de sync forzado para el logout
       registerActivitySync(forceSyncNow);
     };
 
-    // 8. Manejar cambios de estado de la app
+    // ── AppState: sync al ir al fondo, refrescar wallet al volver ────────────
     const onAppState = async (state: AppStateStatus) => {
       if (!isMounted.current) return;
 
       if (state === 'background' || state === 'inactive') {
-        // SYNC FORZADO al ir al background (antes de que el SO suspenda la app)
-        // Esto evita perder pasos cuando el usuario cierra sesión o minimiza la app
-        await syncToSupabase(currentStepsRef.current);
+        // Guardar pasos antes de que el SO suspenda la app
+        await syncToSupabase(currentStepsRef.current, true);
 
       } else if (state === 'active') {
+        // Al volver a la app: re-leer saldo y pasos desde Supabase automáticamente
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { rec, wallet } = await fetchSupabaseData(user.id);
+            applySupabaseData(rec, wallet);
+          }
+        } catch {}
+
         if (Platform.OS === 'ios') {
           const fresh = await readIosHealth();
-          if (fresh > 0) {
-            iosBase.current = fresh;
-            applySteps(fresh);
-          }
+          if (fresh > 0) { iosBase.current = fresh; applySteps(fresh); }
         } else {
-          // Android: reiniciar watch si fue cancelado por el SO
-          if (!watchSub.current) {
-            startWatch();
-          }
+          if (!watchSub.current) startWatch();
         }
       }
     };
 
     const appStateSub = AppState.addEventListener('change', onAppState);
-
     init();
 
     return () => {
@@ -348,9 +358,9 @@ export function useActivity(baseSaldo: number = 0) {
       appStateSub.remove();
       clearActivitySync();
       if (pollTimer) clearInterval(pollTimer);
-      if (syncTimer) clearInterval(syncTimer);
+      if (syncTimer)  clearInterval(syncTimer);
     };
-  }, [applySteps, forceSyncNow, readIosHealth, startWatch, syncToSupabase]);
+  }, [applySteps, applySupabaseData, fetchSupabaseData, forceSyncNow, readIosHealth, startWatch, syncToSupabase]);
 
-  return { activity, totalCoins };
+  return { activity, totalCoins, refreshing, refreshData };
 }

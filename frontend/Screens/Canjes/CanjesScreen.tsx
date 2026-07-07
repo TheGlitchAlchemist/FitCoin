@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { makeStyles } from './CanjesStyles';
@@ -94,7 +94,12 @@ function PastCard({ item, styles }: { item: CanjePassado; styles: ReturnType<typ
   );
 }
 
-export default function CanjesScreen() {
+type CanjesScreenProps = {
+  refreshing?: boolean;
+  onRefresh?: () => void;
+};
+
+export default function CanjesScreen({ refreshing = false, onRefresh }: CanjesScreenProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { activeTab, setActiveTab } = useCanjes();
@@ -105,6 +110,15 @@ export default function CanjesScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.green]}
+            tintColor={colors.green}
+            progressBackgroundColor={colors.surface}
+          />
+        }
       >
         <View style={styles.headerRow}>
           <Text style={styles.pageTitle}>Mis canjes</Text>

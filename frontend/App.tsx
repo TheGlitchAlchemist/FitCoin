@@ -66,21 +66,29 @@ function AppContent() {
   // Perfil → public.profiles
   // Saldo  → último balance_after de coin_transactions (saldo real acumulado)
   const fetchProfile = async (userId: string, userEmail?: string): Promise<UserData> => {
-    // Consultar perfil
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, avatar_url, role, status')
-      .eq('id', userId)
-      .single();
+    // Ambas queries en paralelo — elimina un round-trip completo
+    const [{ data: profile }, { data: wallet }, { data: lastTx }] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, full_name, email, avatar_url, role, status')
+        .eq('id', userId)
+        .single(),
+      supabase
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', userId)
+        .maybeSingle(),
+      // Fallback: si wallets aún no existe para este usuario, usar coin_transactions
+      supabase
+        .from('coin_transactions')
+        .select('balance_after')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
-    // AQUÍ SE OBTIENE EL SALDO REAL DESDE wallets (fuente de verdad del balance)
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    const saldo = wallet?.balance ?? 0;
+    const saldo = wallet?.balance ?? lastTx?.balance_after ?? 0;
 
     return {
       name:   profile?.full_name ?? userEmail ?? 'Usuario',

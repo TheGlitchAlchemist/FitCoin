@@ -122,6 +122,33 @@ export function makeStyles(c: ThemeColors) {
       letterSpacing: 0.5,
     },
 
+    // Etiqueta del negocio (pill con color distinto)
+    businessTag: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      backgroundColor: 'rgba(59,130,246,0.9)',
+      borderRadius: 8,
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+      gap: 4,
+      marginBottom: 2,
+    },
+
+    businessTagText: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: '#FFFFFF',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+
+    rewardDescription: {
+      fontSize: 12,
+      color: 'rgba(255,255,255,0.85)',
+      lineHeight: 16,
+    },
+
     rewardCardName: {
       fontSize: 17,
       fontWeight: '800',
@@ -157,6 +184,38 @@ export function makeStyles(c: ThemeColors) {
     },
 
     redeemButtonText: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: '#FFFFFF',
+    },
+
+    redeemButtonTextSmall: {
+      fontSize: 11,
+    },
+
+    // ─── Estados: cargando / vacío / error ────────────────────────────────────
+    centerBox: {
+      alignItems: 'center',
+      paddingVertical: 40,
+      gap: 12,
+    },
+
+    emptyText: {
+      fontSize: 14,
+      color: c.textSecondary,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+
+    retryButton: {
+      backgroundColor: c.green,
+      borderRadius: 14,
+      paddingVertical: 10,
+      paddingHorizontal: 24,
+      marginTop: 4,
+    },
+
+    retryButtonText: {
       fontSize: 14,
       fontWeight: '800',
       color: '#FFFFFF',

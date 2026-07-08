@@ -1,5 +1,18 @@
-import React, { useMemo, useState } from 'react';
+// ─────────────────────────────────────────────────────────────────────────────
+// MarketplaceScreen — promociones reales desde Supabase (tabla offers)
+//
+// Flujo de canje:
+//   1. Se listan las ofertas activas con su negocio (offers → businesses).
+//   2. "Canjear" solo se habilita con saldo suficiente y stock disponible.
+//   3. Al confirmar en el modal se llama a la RPC `redeem_offer`, que valida
+//      todo en el servidor (saldo, stock, vigencia), genera el código único
+//      FC-XXXXXX, crea el canje como 'issued' y descuenta las FitCoins.
+//   4. El frontend nunca decide el saldo: solo muestra lo que responde la RPC.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   ImageBackground,
   Modal,
@@ -10,47 +23,30 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
 import { makeStyles } from './MarketplaceStyles';
 
-type Reward = {
+// Imagen predeterminada para todas las cards
+const PROMO_IMAGE = require('../assets/img/promo1.png');
+
+type Offer = {
   id: string;
-  name: string;
-  business: string;
-  cost: number;
-  imageUrl: string;
+  title: string;
+  description: string | null;
+  fitcoin_price: number;
+  stock_available: number | null;
+  businesses: { name: string } | null;
 };
 
-const REWARDS: Reward[] = [
-  {
-    id: '1',
-    name: 'Café Fit',
-    business: 'Local FitCafé',
-    cost: 500,
-    imageUrl: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=700&q=80',
-  },
-  {
-    id: '2',
-    name: 'Pase de gimnasio',
-    business: 'The Gym',
-    cost: 750,
-    imageUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=700&q=80',
-  },
-  {
-    id: '3',
-    name: 'Bowl saludable',
-    business: 'Green Eats',
-    cost: 1000,
-    imageUrl: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=700&q=80',
-  },
-  {
-    id: '4',
-    name: 'Descuento deportivo',
-    business: 'SportZone',
-    cost: 650,
-    imageUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=700&q=80',
-  },
-];
+type RedeemResult = {
+  redemption_code: string;
+  new_balance: number;
+  offer_title: string;
+  business_name: string | null;
+  fitcoin_price: number;
+  expires_at: string;
+};
 
 type Props = {
   totalCoins: number;
@@ -61,7 +57,132 @@ type Props = {
 export default function MarketplaceScreen({ totalCoins, refreshing = false, onRefresh }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
+
+  const [offers, setOffers]     = useState<Offer[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
+  const [redeeming, setRedeeming] = useState(false);
+
+  // ── Leer ofertas reales desde Supabase ─────────────────────────────────────
+  const fetchOffers = useCallback(async () => {
+    const nowIso = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('offers')
+      .select('id, title, description, fitcoin_price, stock_available, businesses(name)')
+      .eq('active', true)
+      .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      setLoadError(error.message);
+    } else {
+      setLoadError(null);
+      setOffers((data ?? []) as unknown as Offer[]);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchOffers();
+  }, [fetchOffers]);
+
+  // Pull-to-refresh: ofertas + saldo (el saldo lo refresca el Dashboard)
+  const handleRefresh = useCallback(() => {
+    fetchOffers();
+    onRefresh?.();
+  }, [fetchOffers, onRefresh]);
+
+  // ── Canjear vía RPC ─────────────────────────────────────────────────────────
+  const confirmRedeem = useCallback(async () => {
+    if (!selectedOffer || redeeming) return;
+
+    // Revalidación local antes de llamar (el servidor valida de nuevo)
+    if (totalCoins < selectedOffer.fitcoin_price) {
+      setSelectedOffer(null);
+      Alert.alert('Saldo insuficiente', 'No tienes FitCoins suficientes para este canje.');
+      return;
+    }
+
+    setRedeeming(true);
+    try {
+      const { data, error } = await supabase.rpc('redeem_offer', {
+        p_offer_id: selectedOffer.id,
+      });
+
+      if (error) {
+        Alert.alert('No se pudo canjear', error.message);
+        return;
+      }
+
+      const r = data as RedeemResult;
+      setSelectedOffer(null);
+
+      Alert.alert(
+        '¡Canje realizado! 🎉',
+        `${r.offer_title}\n${r.business_name ?? ''}\n\n` +
+          `Tu código de canje es:\n\n${r.redemption_code}\n\n` +
+          `Muéstralo en el negocio para usarlo.\n` +
+          `Nuevo saldo: ${r.new_balance} FC`,
+        [{ text: 'Entendido' }],
+      );
+
+      // Refrescar stock de ofertas y saldo del usuario
+      fetchOffers();
+      onRefresh?.();
+    } catch (e) {
+      Alert.alert('Error de red', 'No se pudo completar el canje. Revisa tu conexión e intenta de nuevo.');
+    } finally {
+      setRedeeming(false);
+    }
+  }, [selectedOffer, redeeming, totalCoins, fetchOffers, onRefresh]);
+
+  // ── Card de oferta ──────────────────────────────────────────────────────────
+  const renderOfferCard = (offer: Offer) => {
+    const insufficient = totalCoins < offer.fitcoin_price;
+    const outOfStock   = offer.stock_available !== null && offer.stock_available <= 0;
+    const disabled     = insufficient || outOfStock;
+
+    return (
+      <ImageBackground
+        key={offer.id}
+        source={PROMO_IMAGE}
+        style={styles.rewardCard}
+        imageStyle={styles.rewardCardImage}
+      >
+        <View style={styles.rewardOverlay}>
+          <View style={styles.rewardOverlayLeft}>
+            <View style={styles.businessTag}>
+              <Ionicons name="storefront" size={10} color="#FFFFFF" />
+              <Text style={styles.businessTagText}>
+                {offer.businesses?.name ?? 'Negocio'}
+              </Text>
+            </View>
+            <Text style={styles.rewardCardName}>{offer.title}</Text>
+            {!!offer.description && (
+              <Text style={styles.rewardDescription} numberOfLines={2}>
+                {offer.description}
+              </Text>
+            )}
+            <View style={styles.rewardCostBadge}>
+              <Text style={styles.rewardCostText}>{offer.fitcoin_price} FC</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.redeemButton, disabled && styles.redeemButtonDisabled]}
+            disabled={disabled}
+            onPress={() => setSelectedOffer(offer)}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.redeemButtonText, disabled && styles.redeemButtonTextSmall]}>
+              {outOfStock ? 'Agotado' : insufficient ? 'Saldo insuficiente' : 'Canjear'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ImageBackground>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -71,7 +192,7 @@ export default function MarketplaceScreen({ totalCoins, refreshing = false, onRe
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
+            onRefresh={handleRefresh}
             colors={[colors.green]}
             tintColor={colors.green}
             progressBackgroundColor={colors.surface}
@@ -97,52 +218,40 @@ export default function MarketplaceScreen({ totalCoins, refreshing = false, onRe
 
         <Text style={styles.sectionTitle}>Recompensas disponibles</Text>
 
-        {REWARDS.map((reward) => (
-          <ImageBackground
-            key={reward.id}
-            source={{ uri: reward.imageUrl }}
-            style={styles.rewardCard}
-            imageStyle={styles.rewardCardImage}
-          >
-            <View style={styles.rewardOverlay}>
-              <View style={styles.rewardOverlayLeft}>
-                <Text style={styles.rewardCardBusiness}>{reward.business}</Text>
-                <Text style={styles.rewardCardName}>{reward.name}</Text>
-                <View style={styles.rewardCostBadge}>
-                  <Text style={styles.rewardCostText}>{reward.cost} FC</Text>
-                </View>
-              </View>
+        {loading && (
+          <View style={styles.centerBox}>
+            <ActivityIndicator size="large" color={colors.green} />
+          </View>
+        )}
 
-              <TouchableOpacity
-                style={[
-                  styles.redeemButton,
-                  totalCoins < reward.cost && styles.redeemButtonDisabled,
-                ]}
-                onPress={() => {
-                  if (totalCoins < reward.cost) {
-                    Alert.alert(
-                      'Saldo insuficiente',
-                      `Necesitas ${reward.cost} FC. Tienes ${totalCoins} FC.\nTe faltan ${reward.cost - totalCoins} FC — ¡sigue caminando!`
-                    );
-                    return;
-                  }
-                  setSelectedReward(reward);
-                }}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.redeemButtonText}>Canjear</Text>
-              </TouchableOpacity>
-            </View>
-          </ImageBackground>
-        ))}
+        {!loading && loadError && (
+          <View style={styles.centerBox}>
+            <Ionicons name="cloud-offline-outline" size={44} color={colors.border} />
+            <Text style={styles.emptyText}>No se pudieron cargar las ofertas.{'\n'}{loadError}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={fetchOffers} activeOpacity={0.85}>
+              <Text style={styles.retryButtonText}>Reintentar</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!loading && !loadError && offers.length === 0 && (
+          <View style={styles.centerBox}>
+            <Ionicons name="pricetags-outline" size={44} color={colors.border} />
+            <Text style={styles.emptyText}>
+              Por ahora no hay promociones disponibles.{'\n'}Vuelve pronto.
+            </Text>
+          </View>
+        )}
+
+        {!loading && !loadError && offers.map(renderOfferCard)}
       </ScrollView>
 
-      {/* Modal confirmación */}
+      {/* Modal de confirmación */}
       <Modal
-        visible={selectedReward !== null}
+        visible={selectedOffer !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setSelectedReward(null)}
+        onRequestClose={() => !redeeming && setSelectedOffer(null)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -150,32 +259,34 @@ export default function MarketplaceScreen({ totalCoins, refreshing = false, onRe
               <Ionicons name="gift-outline" size={36} color={colors.green} />
             </View>
             <Text style={styles.modalTitle}>
-              ¿Seguro que quieres canjear esta recompensa?
+              ¿Seguro que quieres canjear esta promoción?
             </Text>
-            <Text style={styles.modalRewardName}>{selectedReward?.name}</Text>
+            <Text style={styles.modalRewardName}>{selectedOffer?.title}</Text>
             <View style={styles.modalCostRow}>
               <View style={styles.rewardCostBadge}>
-                <Text style={styles.rewardCostText}>{selectedReward?.cost} FC</Text>
+                <Text style={styles.rewardCostText}>{selectedOffer?.fitcoin_price} FC</Text>
               </View>
             </View>
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalButtonNo}
-                onPress={() => setSelectedReward(null)}
+                onPress={() => setSelectedOffer(null)}
+                disabled={redeeming}
                 activeOpacity={0.85}
               >
                 <Text style={styles.modalButtonNoText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.modalButtonYes}
-                onPress={() => {
-                  const name = selectedReward?.name;
-                  setSelectedReward(null);
-                  Alert.alert('¡Canje realizado!', `Has canjeado: ${name}`);
-                }}
+                style={[styles.modalButtonYes, redeeming && styles.redeemButtonDisabled]}
+                onPress={confirmRedeem}
+                disabled={redeeming}
                 activeOpacity={0.85}
               >
-                <Text style={styles.modalButtonYesText}>Sí, canjear</Text>
+                {redeeming ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalButtonYesText}>Sí, canjear</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>

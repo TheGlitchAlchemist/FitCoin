@@ -307,5 +307,140 @@ export function makeStyles(c: ThemeColors) {
       fontWeight: '800',
       color: '#FFFFFF',
     },
+
+    // ─── Modal de éxito (liquid glass) ────────────────────────────────────────
+    successCard: {
+      backgroundColor: c.surface,
+      borderRadius: 30,
+      padding: 28,
+      width: '100%',
+      alignItems: 'center',
+      // Efecto glass: borde translúcido + sombra profunda
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.14)',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 24 },
+      shadowOpacity: 0.35,
+      shadowRadius: 40,
+      elevation: 20,
+    },
+
+    successIconWrap: {
+      width: 84,
+      height: 84,
+      borderRadius: 42,
+      backgroundColor: c.greenLight,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: 'rgba(34,197,94,0.35)',
+    },
+
+    successTitle: {
+      fontSize: 22,
+      fontWeight: '900',
+      color: c.textPrimary,
+      marginBottom: 12,
+    },
+
+    successOfferName: {
+      fontSize: 17,
+      fontWeight: '800',
+      color: c.green,
+      textAlign: 'center',
+    },
+
+    successBusiness: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: c.textSecondary,
+      marginTop: 2,
+      marginBottom: 4,
+    },
+
+    successCodeBox: {
+      width: '100%',
+      backgroundColor: 'rgba(212,175,55,0.10)',
+      borderRadius: 18,
+      borderWidth: 1.5,
+      borderColor: c.gold,
+      borderStyle: 'dashed',
+      paddingVertical: 16,
+      paddingHorizontal: 18,
+      alignItems: 'center',
+      marginTop: 14,
+      marginBottom: 16,
+    },
+
+    successCodeLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: c.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: 6,
+    },
+
+    successCodeValue: {
+      fontSize: 28,
+      fontWeight: '900',
+      color: c.gold,
+      letterSpacing: 3,
+    },
+
+    successCodeHint: {
+      fontSize: 12,
+      color: c.textSecondary,
+      marginTop: 6,
+    },
+
+    successBalanceRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 20,
+    },
+
+    balanceCoinCircleSmall: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: c.gold,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+
+    balanceCoinLabelSmall: {
+      fontSize: 9,
+      fontWeight: '900',
+      color: '#FFFFFF',
+    },
+
+    successBalanceText: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: c.textPrimary,
+    },
+
+    successButton: {
+      width: '100%',
+      backgroundColor: c.green,
+      borderRadius: 16,
+      paddingVertical: 15,
+      alignItems: 'center',
+    },
+
+    successButtonText: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: '#FFFFFF',
+    },
+
+    successFootnote: {
+      fontSize: 12,
+      color: c.textMuted,
+      marginTop: 12,
+    },
   });
 }

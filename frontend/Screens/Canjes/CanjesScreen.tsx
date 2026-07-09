@@ -1,39 +1,38 @@
-import React, { useMemo } from 'react';
-import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { makeStyles } from './CanjesStyles';
 import { useTheme } from '../../lib/theme';
-import {
-  CANJES_ACTIVOS,
-  CANJES_PASADOS,
-  CanjeActivo,
-  CanjePassado,
-  useCanjes,
-} from './useCanjes';
+import { Canje, useCanjes } from './useCanjes';
 
-const CATEGORY_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  'a1': 'cafe-outline',
-  'a2': 'restaurant-outline',
-  'p1': 'barbell-outline',
-  'p2': 'shirt-outline',
-  'p3': 'cafe-outline',
+const STATUS_LABELS: Record<string, string> = {
+  used:      'Usado',
+  expired:   'Expirado',
+  cancelled: 'Cancelado',
 };
 
-function ActiveCard({ item, styles }: { item: CanjeActivo; styles: ReturnType<typeof makeStyles> }) {
-  const icon = CATEGORY_ICONS[item.id] ?? 'gift-outline';
-
+function ActiveCard({ item, styles }: { item: Canje; styles: ReturnType<typeof makeStyles> }) {
   return (
     <View style={styles.activeCard}>
       <View style={styles.activeCardTop}>
         <View style={[styles.activeEmojiBox, { backgroundColor: item.color + '22' }]}>
-          <Ionicons name={icon} size={26} color={item.color} />
+          <Ionicons name="gift-outline" size={26} color={item.color} />
         </View>
 
         <View style={styles.activeInfo}>
           <Text style={styles.activeName}>{item.nombre}</Text>
           <Text style={styles.activeBusiness}>{item.negocio}</Text>
-          <Text style={styles.activeDescription}>{item.descripcion}</Text>
+          {!!item.descripcion && (
+            <Text style={styles.activeDescription}>{item.descripcion}</Text>
+          )}
         </View>
       </View>
 
@@ -63,13 +62,11 @@ function ActiveCard({ item, styles }: { item: CanjeActivo; styles: ReturnType<ty
   );
 }
 
-function PastCard({ item, styles }: { item: CanjePassado; styles: ReturnType<typeof makeStyles> }) {
-  const icon = CATEGORY_ICONS[item.id] ?? 'gift-outline';
-
+function PastCard({ item, styles }: { item: Canje; styles: ReturnType<typeof makeStyles> }) {
   return (
     <View style={styles.pastCard}>
       <View style={[styles.pastEmojiBox, { backgroundColor: item.color + '18' }]}>
-        <Ionicons name={icon} size={24} color={item.color} style={{ opacity: 0.6 }} />
+        <Ionicons name="gift-outline" size={24} color={item.color} style={{ opacity: 0.6 }} />
       </View>
 
       <View style={styles.pastInfo}>
@@ -87,7 +84,9 @@ function PastCard({ item, styles }: { item: CanjePassado; styles: ReturnType<typ
           <Text style={styles.pastCostText}>{item.costo} FC</Text>
         </View>
         <View style={styles.usedBadge}>
-          <Text style={styles.usedBadgeText}>Usado</Text>
+          <Text style={styles.usedBadgeText}>
+            {STATUS_LABELS[item.status] ?? 'Usado'}
+          </Text>
         </View>
       </View>
     </View>
@@ -102,7 +101,13 @@ type CanjesScreenProps = {
 export default function CanjesScreen({ refreshing = false, onRefresh }: CanjesScreenProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { activeTab, setActiveTab } = useCanjes();
+  const { activeTab, setActiveTab, activos, pasados, loading, error, refetch } = useCanjes();
+
+  // Pull-to-refresh: recarga los canjes y el saldo (vía Dashboard)
+  const handleRefresh = useCallback(() => {
+    refetch();
+    onRefresh?.();
+  }, [refetch, onRefresh]);
 
   return (
     <View style={styles.screen}>
@@ -113,7 +118,7 @@ export default function CanjesScreen({ refreshing = false, onRefresh }: CanjesSc
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
+            onRefresh={handleRefresh}
             colors={[colors.green]}
             tintColor={colors.green}
             progressBackgroundColor={colors.surface}
@@ -147,9 +152,23 @@ export default function CanjesScreen({ refreshing = false, onRefresh }: CanjesSc
           </TouchableOpacity>
         </View>
 
-        {activeTab === 'activos' && (
+        {loading && (
+          <View style={styles.emptyContainer}>
+            <ActivityIndicator size="large" color={colors.green} />
+          </View>
+        )}
+
+        {!loading && error && (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="cloud-offline-outline" size={52} color={colors.border} style={{ marginBottom: 16 }} />
+            <Text style={styles.emptyTitle}>No se pudieron cargar tus canjes</Text>
+            <Text style={styles.emptyText}>{error}</Text>
+          </View>
+        )}
+
+        {!loading && !error && activeTab === 'activos' && (
           <>
-            {CANJES_ACTIVOS.length === 0 ? (
+            {activos.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons name="ticket-outline" size={52} color={colors.border} style={{ marginBottom: 16 }} />
                 <Text style={styles.emptyTitle}>Sin canjes activos</Text>
@@ -158,14 +177,14 @@ export default function CanjesScreen({ refreshing = false, onRefresh }: CanjesSc
                 </Text>
               </View>
             ) : (
-              CANJES_ACTIVOS.map((item) => <ActiveCard key={item.id} item={item} styles={styles} />)
+              activos.map((item) => <ActiveCard key={item.id} item={item} styles={styles} />)
             )}
           </>
         )}
 
-        {activeTab === 'pasados' && (
+        {!loading && !error && activeTab === 'pasados' && (
           <>
-            {CANJES_PASADOS.length === 0 ? (
+            {pasados.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons name="document-outline" size={52} color={colors.border} style={{ marginBottom: 16 }} />
                 <Text style={styles.emptyTitle}>Sin historial</Text>
@@ -174,7 +193,7 @@ export default function CanjesScreen({ refreshing = false, onRefresh }: CanjesSc
                 </Text>
               </View>
             ) : (
-              CANJES_PASADOS.map((item) => <PastCard key={item.id} item={item} styles={styles} />)
+              pasados.map((item) => <PastCard key={item.id} item={item} styles={styles} />)
             )}
           </>
         )}

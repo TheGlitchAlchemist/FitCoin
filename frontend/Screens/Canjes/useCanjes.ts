@@ -1,85 +1,101 @@
-import { useState } from 'react';
+// ─────────────────────────────────────────────────────────────────────────────
+// useCanjes — canjes reales del usuario desde Supabase (tabla redemptions)
+//
+// Estados del enum redemption_status:
+//   issued    → canje ACTIVO (la app lo muestra como "Activo")
+//   used      → validado por el negocio desde el dashboard web → historial
+//   expired   → venció sin usarse → historial
+//   cancelled → cancelado → historial
+//
+// Un canje 'issued' cuya fecha expires_at ya pasó se muestra en el
+// historial como "Expirado" aunque la web aún no cambie su estado.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { useCallback, useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabase';
 
 export type CanjesTab = 'activos' | 'pasados';
 
-export type CanjeActivo = {
+export type RedemptionStatus = 'issued' | 'used' | 'expired' | 'cancelled';
+
+export type Canje = {
   id: string;
-  nombre: string;
-  negocio: string;
+  nombre: string;       // título de la oferta
+  negocio: string;      // nombre del negocio
   descripcion: string;
-  emoji: string;
-  color: string;
-  codigo: string;
-  expira: string;
-  costo: number;
+  color: string;        // color decorativo de la card
+  codigo: string;       // FC-XXXXXX
+  costo: number;        // fitcoin_price_at_purchase
+  status: RedemptionStatus;
+  fechaCanje: string;   // created_at legible
+  expira: string;       // expires_at legible
+  isActive: boolean;
 };
 
-export type CanjePassado = {
-  id: string;
-  nombre: string;
-  negocio: string;
-  emoji: string;
-  color: string;
-  fechaCanje: string;
-  costo: number;
-};
+const CARD_COLORS = ['#22C55E', '#3B82F6', '#F59E0B', '#8B5CF6', '#EC4899', '#38B2AC'];
 
-export const CANJES_ACTIVOS: CanjeActivo[] = [
-  {
-    id: 'a1',
-    nombre: 'Café Fit',
-    negocio: 'Local FitCafé',
-    descripcion: 'Bebida saludable para después de entrenar.',
-    emoji: '☕',
-    color: '#FF8C69',
-    codigo: 'FC-2024-A1B2',
-    expira: '30 Jun 2025',
-    costo: 500,
-  },
-  {
-    id: 'a2',
-    nombre: 'Bowl saludable',
-    negocio: 'Green Eats',
-    descripcion: 'Bowl nutritivo con proteína y vegetales.',
-    emoji: '🥗',
-    color: '#38B2AC',
-    codigo: 'FC-2024-C3D4',
-    expira: '15 Jul 2025',
-    costo: 1000,
-  },
-];
-
-export const CANJES_PASADOS: CanjePassado[] = [
-  {
-    id: 'p1',
-    nombre: 'Pase de gimnasio',
-    negocio: 'The Gym',
-    emoji: '🏋️',
-    color: '#7C72E5',
-    fechaCanje: '12 May 2025',
-    costo: 750,
-  },
-  {
-    id: 'p2',
-    nombre: 'Descuento deportivo',
-    negocio: 'SportZone',
-    emoji: '👟',
-    color: '#F6AD55',
-    fechaCanje: '3 Abr 2025',
-    costo: 650,
-  },
-  {
-    id: 'p3',
-    nombre: 'Café Fit',
-    negocio: 'Local FitCafé',
-    emoji: '☕',
-    color: '#FF8C69',
-    fechaCanje: '20 Mar 2025',
-    costo: 500,
-  },
-];
+function formatDate(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('es-MX', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  });
+}
 
 export function useCanjes() {
   const [activeTab, setActiveTab] = useState<CanjesTab>('activos');
-  return { activeTab, setActiveTab };
+  const [canjes, setCanjes]   = useState<Canje[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
+
+  const fetchCanjes = useCallback(async () => {
+    const { data, error: err } = await supabase
+      .from('redemptions')
+      .select(
+        'id, redemption_code, status, fitcoin_price_at_purchase, created_at, expires_at, ' +
+        'offers(title, description), businesses(name)'
+      )
+      .order('created_at', { ascending: false });
+
+    if (err) {
+      setError(err.message);
+      setLoading(false);
+      return;
+    }
+
+    const now = Date.now();
+    const mapped: Canje[] = (data ?? []).map((r: any, idx: number) => {
+      const expired  = r.expires_at ? new Date(r.expires_at).getTime() < now : false;
+      const isActive = r.status === 'issued' && !expired;
+      // issued pero vencido → mostrarlo como expirado en el historial
+      const status: RedemptionStatus =
+        r.status === 'issued' && expired ? 'expired' : r.status;
+
+      return {
+        id:          r.id,
+        nombre:      r.offers?.title ?? 'Promoción',
+        negocio:     r.businesses?.name ?? 'Negocio',
+        descripcion: r.offers?.description ?? '',
+        color:       CARD_COLORS[idx % CARD_COLORS.length],
+        codigo:      r.redemption_code,
+        costo:       r.fitcoin_price_at_purchase ?? 0,
+        status,
+        fechaCanje:  formatDate(r.created_at),
+        expira:      formatDate(r.expires_at),
+        isActive,
+      };
+    });
+
+    setError(null);
+    setCanjes(mapped);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchCanjes();
+  }, [fetchCanjes]);
+
+  const activos = canjes.filter(c => c.isActive);
+  const pasados = canjes.filter(c => !c.isActive);
+
+  return { activeTab, setActiveTab, activos, pasados, loading, error, refetch: fetchCanjes };
 }

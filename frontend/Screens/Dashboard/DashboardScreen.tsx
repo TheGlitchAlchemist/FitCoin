@@ -287,6 +287,7 @@ export default function DashboardScreen({ userData, onLogout }: DashboardScreenP
           totalCoins={totalCoins}
           refreshing={refreshing}
           onRefresh={refreshData}
+          onGoToRedemptions={() => setActiveTab('redemptions')}
         />
       );
     }

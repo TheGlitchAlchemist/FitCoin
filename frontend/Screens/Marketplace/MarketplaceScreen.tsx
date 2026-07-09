@@ -52,9 +52,16 @@ type Props = {
   totalCoins: number;
   refreshing?: boolean;
   onRefresh?: () => void;
+  /** Navega a la pestaña "Mis canjes" (la provee el Dashboard) */
+  onGoToRedemptions?: () => void;
 };
 
-export default function MarketplaceScreen({ totalCoins, refreshing = false, onRefresh }: Props) {
+export default function MarketplaceScreen({
+  totalCoins,
+  refreshing = false,
+  onRefresh,
+  onGoToRedemptions,
+}: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -63,6 +70,7 @@ export default function MarketplaceScreen({ totalCoins, refreshing = false, onRe
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
   const [redeeming, setRedeeming] = useState(false);
+  const [successData, setSuccessData] = useState<RedeemResult | null>(null);
 
   // ── Leer ofertas reales desde Supabase ─────────────────────────────────────
   const fetchOffers = useCallback(async () => {
@@ -117,15 +125,7 @@ export default function MarketplaceScreen({ totalCoins, refreshing = false, onRe
 
       const r = data as RedeemResult;
       setSelectedOffer(null);
-
-      Alert.alert(
-        '¡Canje realizado! 🎉',
-        `${r.offer_title}\n${r.business_name ?? ''}\n\n` +
-          `Tu código de canje es:\n\n${r.redemption_code}\n\n` +
-          `Muéstralo en el negocio para usarlo.\n` +
-          `Nuevo saldo: ${r.new_balance} FC`,
-        [{ text: 'Entendido' }],
-      );
+      setSuccessData(r); // abre el modal de éxito estilo FitCoin
 
       // Refrescar stock de ofertas y saldo del usuario
       fetchOffers();
@@ -136,6 +136,12 @@ export default function MarketplaceScreen({ totalCoins, refreshing = false, onRe
       setRedeeming(false);
     }
   }, [selectedOffer, redeeming, totalCoins, fetchOffers, onRefresh]);
+
+  // Cerrar el modal de éxito → mandar automáticamente a "Mis canjes"
+  const closeSuccess = useCallback(() => {
+    setSuccessData(null);
+    onGoToRedemptions?.();
+  }, [onGoToRedemptions]);
 
   // ── Card de oferta ──────────────────────────────────────────────────────────
   const renderOfferCard = (offer: Offer) => {
@@ -289,6 +295,56 @@ export default function MarketplaceScreen({ totalCoins, refreshing = false, onRe
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de éxito — estilo liquid glass FitCoin */}
+      <Modal
+        visible={successData !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={closeSuccess}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successCard}>
+            <View style={styles.successIconWrap}>
+              <Ionicons name="checkmark-circle" size={54} color={colors.green} />
+            </View>
+
+            <Text style={styles.successTitle}>¡Canje realizado!</Text>
+
+            <Text style={styles.successOfferName}>{successData?.offer_title}</Text>
+            {!!successData?.business_name && (
+              <Text style={styles.successBusiness}>{successData.business_name}</Text>
+            )}
+
+            <View style={styles.successCodeBox}>
+              <Text style={styles.successCodeLabel}>Tu código de canje</Text>
+              <Text style={styles.successCodeValue}>{successData?.redemption_code}</Text>
+              <Text style={styles.successCodeHint}>Muéstralo en el negocio para usarlo</Text>
+            </View>
+
+            <View style={styles.successBalanceRow}>
+              <View style={styles.balanceCoinCircleSmall}>
+                <Text style={styles.balanceCoinLabelSmall}>FC</Text>
+              </View>
+              <Text style={styles.successBalanceText}>
+                Nuevo saldo: {successData?.new_balance} FC
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.successButton}
+              onPress={closeSuccess}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.successButtonText}>Entendido</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.successFootnote}>
+              Lo encontrarás en “Mis canjes”
+            </Text>
           </View>
         </View>
       </Modal>

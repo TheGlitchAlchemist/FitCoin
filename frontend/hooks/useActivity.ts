@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState, AppStateStatus, Platform } from 'react-native';
 import { Pedometer } from 'expo-sensors';
+import * as Location from 'expo-location';
 import { supabase } from '../lib/supabase';
 import { clearActivitySync, registerActivitySync } from '../lib/activitySync';
 
@@ -49,6 +50,7 @@ const INITIAL: ActivityData = {
 
 type SyncResult = {
   suspicious: boolean;
+  reason?: 'ritmo_imposible' | 'sin_desplazamiento' | null;
   steps: number;
   fitcoins_earned: number;
   coins_awarded: number;
@@ -104,6 +106,34 @@ export function useActivity(baseSaldo: number = 0) {
 
   const dateRef  = useRef(todayStr());
   const syncBusy = useRef(false);
+
+  // Ubicación: SOLO se consulta al momento de sincronizar (nunca en
+  // segundo plano ni de forma continua). Se manda al servidor para
+  // validar que hubo desplazamiento real, no se guarda ninguna ruta.
+  const locationAllowed = useRef(false);
+
+  const getCoords = useCallback(async (fresh: boolean): Promise<{ lat: number; lng: number } | null> => {
+    if (!locationAllowed.current) return null;
+    try {
+      let pos: Location.LocationObject | null;
+      if (fresh) {
+        // Lectura fresca (abrir Dashboard / pull-to-refresh), con timeout
+        pos = await Promise.race([
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+          new Promise<null>(resolve => setTimeout(() => resolve(null), 6000)),
+        ]);
+      } else {
+        // Sync periódico: usar la última posición conocida (sin encender GPS)
+        pos = await Location.getLastKnownPositionAsync();
+      }
+      if (!pos) return null;
+      // Descartar lecturas muy imprecisas (evita falsos positivos)
+      if (pos.coords.accuracy !== null && pos.coords.accuracy > 100) return null;
+      return { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    } catch {
+      return null;
+    }
+  }, []);
 
   // En un APK instalado nadie ve console.warn: el primer error de cada sesión
   // se muestra en un Alert para poder diagnosticar en el dispositivo.
@@ -196,16 +226,22 @@ export function useActivity(baseSaldo: number = 0) {
   }, [currentSteps, reportError, updateUI]);
 
   // ── SYNC: la única vía para generar (o perder) FitCoins ───────────────────
-  const syncActivity = useCallback(async (showAlert: boolean = true) => {
+  // freshLocation: true al abrir Dashboard y en pull-to-refresh (lectura GPS
+  // fresca); false en el sync periódico (usa la última posición conocida).
+  const syncActivity = useCallback(async (showAlert: boolean = true, freshLocation: boolean = false) => {
     if (syncBusy.current) return;
     syncBusy.current = true;
     try {
       checkDayChange();
 
-      const steps = currentSteps();
+      const steps  = currentSteps();
+      const coords = await getCoords(freshLocation);
+
       const { data, error } = await supabase.rpc('sync_daily_activity', {
         p_current_steps: steps,
         p_activity_date: todayStr(),
+        p_lat: coords?.lat ?? null,
+        p_lng: coords?.lng ?? null,
       });
 
       if (error) {
@@ -229,11 +265,14 @@ export function useActivity(baseSaldo: number = 0) {
       }
 
       if (r.suspicious && showAlert && isMounted.current) {
+        const motivo = r.reason === 'sin_desplazamiento'
+          ? 'Registraste muchos pasos sin moverte de lugar.'
+          : 'Detectamos un aumento de pasos anormalmente rápido.';
         Alert.alert(
           '⚠️ Actividad sospechosa',
           r.penalty_applied
-            ? 'Detectamos un aumento de pasos anormalmente rápido. Esos pasos no se contarán y se descontó 1 FitCoin de tu saldo.'
-            : 'Detectamos un aumento de pasos anormalmente rápido. Esos pasos no se contarán.',
+            ? `${motivo} Esos pasos no se contarán y se descontó 1 FitCoin de tu saldo.`
+            : `${motivo} Esos pasos no se contarán.`,
           [{ text: 'Entendido' }],
         );
       }
@@ -246,13 +285,13 @@ export function useActivity(baseSaldo: number = 0) {
     } finally {
       syncBusy.current = false;
     }
-  }, [checkDayChange, currentSteps, reportError, updateUI]);
+  }, [checkDayChange, currentSteps, getCoords, reportError, updateUI]);
 
   // ── Pull-to-refresh: sync + relectura completa ─────────────────────────────
   const refreshData = useCallback(async () => {
     setRefreshing(true);
     try {
-      await syncActivity(true);
+      await syncActivity(true, true); // con lectura de ubicación fresca
       await loadFromSupabase(); // cubre canjes hechos en otra pantalla/dispositivo
     } catch (e) {
       console.warn('[useActivity] Error en refresh:', e);
@@ -298,8 +337,19 @@ export function useActivity(baseSaldo: number = 0) {
         console.warn('[useActivity] Error init Supabase:', e);
       }
 
-      // 2) Permisos
+      // 2) Permisos de actividad física
       const { status } = await Pedometer.requestPermissionsAsync();
+
+      // Permiso de ubicación (solo "mientras usas la app", nunca en background).
+      // Si el usuario lo niega, la app sigue funcionando: el servidor
+      // valida solo por ritmo de pasos.
+      try {
+        const loc = await Location.requestForegroundPermissionsAsync();
+        locationAllowed.current = loc.status === 'granted';
+      } catch {
+        locationAllowed.current = false;
+      }
+
       if (status !== 'granted') {
         if (isMounted.current) {
           setActivity(prev => ({
@@ -340,10 +390,9 @@ export function useActivity(baseSaldo: number = 0) {
 
       startWatch();
 
-      // 5) SYNC DE LÍNEA BASE: marca last_sync_at = ahora en el servidor.
-      // Sin esto, el primer sync del día medía la tasa contra una ventana
-      // de horas y cualquier cantidad de pasos falsos pasaba como válida.
-      syncActivity(false);
+      // 5) SYNC DE LÍNEA BASE: marca last_sync_at = ahora y guarda la
+      // ubicación de partida (con lectura GPS fresca al abrir el Dashboard).
+      syncActivity(false, true);
 
       // 6) Sync periódico (aquí es donde el servidor valida y otorga FC)
       syncTimer = setInterval(() => {

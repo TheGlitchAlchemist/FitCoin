@@ -73,21 +73,44 @@ export default function MarketplaceScreen({
   const [successData, setSuccessData] = useState<RedeemResult | null>(null);
 
   // ── Leer ofertas reales desde Supabase ─────────────────────────────────────
+  // Se ocultan las ofertas que ESTE usuario ya canjeó (para los demás siguen
+  // visibles; la oferta no se toca en la base).
   const fetchOffers = useCallback(async () => {
     const nowIso = new Date().toISOString();
-    const { data, error } = await supabase
-      .from('offers')
-      .select('id, title, description, fitcoin_price, stock_available, businesses(name)')
-      .eq('active', true)
-      .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
-      .order('created_at', { ascending: false });
 
-    if (error) {
-      setLoadError(error.message);
-    } else {
-      setLoadError(null);
-      setOffers((data ?? []) as unknown as Offer[]);
+    const [offersRes, userRes] = await Promise.all([
+      supabase
+        .from('offers')
+        .select('id, title, description, fitcoin_price, stock_available, businesses(name)')
+        .eq('active', true)
+        .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
+        .order('created_at', { ascending: false }),
+      supabase.auth.getUser(),
+    ]);
+
+    if (offersRes.error) {
+      setLoadError(offersRes.error.message);
+      setLoading(false);
+      return;
     }
+
+    // Ofertas ya canjeadas por este usuario (canje vigente o ya usado)
+    let redeemedIds = new Set<string>();
+    const userId = userRes.data.user?.id;
+    if (userId) {
+      const { data: reds } = await supabase
+        .from('redemptions')
+        .select('offer_id')
+        .eq('user_id', userId)
+        .in('status', ['issued', 'used']);
+      redeemedIds = new Set((reds ?? []).map(r => r.offer_id as string));
+    }
+
+    const visible = ((offersRes.data ?? []) as unknown as Offer[])
+      .filter(o => !redeemedIds.has(o.id));
+
+    setLoadError(null);
+    setOffers(visible);
     setLoading(false);
   }, []);
 
